@@ -1,43 +1,41 @@
-# Crypto Big Data Platform
+# Crypto Data Analytics System
 
-## Overview
+Hệ thống phân tích dữ liệu crypto theo kiến trúc Lambda:
+- Ingestion: CCXT -> Kafka
+- Processing: Batch (PySpark) + Streaming (Spark Structured Streaming)
+- Storage/Serving: MinIO, MongoDB, Redis
+- API: Backend service (không khóa framework)
+- UI: Next.js
 
-This project is a system for collecting, storing, processing, and analyzing cryptocurrency data.
-It is designed to handle large volumes of data and provide useful insights for users.
+## Trạng thái hiện tại
 
----
+- Hạ tầng local Tuần 1 đã chạy được bằng Docker Compose
+- Tài liệu vận hành: `WEEK1_INFRA_GUIDE.md`
+- Mặc định frontend dùng Next.js, backend để mở framework cho team lựa chọn
 
-## Objectives
+## Cấu trúc thư mục đề xuất
 
-- Collect cryptocurrency data from different sources
-- Store and manage large-scale data
-- Process and analyze the collected data
-- Provide meaningful insights from the data
+```text
+.
+├─ backend/                  # Backend service (framework-agnostic)
+├─ frontend-nextjs/          # Frontend Next.js
+├─ ingestion/
+│  └─ collector/             # CCXT producer -> Kafka
+├─ processing/
+│  ├─ batch/                 # PySpark jobs (cold path)
+│  └─ streaming/             # Spark streaming jobs (hot path)
+├─ storage/                  # Sink/connector configs (MinIO/Mongo/Redis)
+├─ monitoring/               # Prometheus/Grafana config
+├─ scripts/                  # Utility scripts
+├─ docs/                     # Tài liệu kiến trúc/quy ước
+├─ docker-compose.yaml
+├─ .env.example
+└─ WEEK1_INFRA_GUIDE.md
+```
 
----
+## Quy ước triển khai
 
-## System Description
-
-The system works by gathering data, storing it, processing it, and then generating analysis results.
-It supports handling large datasets efficiently and can be extended for real-time or advanced analytics.
-
----
-
-## Features
-
-- Data collection
-- Data storage
-- Data processing
-- Data analysis
-
----
-
-## Use Cases
-
-- Cryptocurrency market analysis
-- Data analysis practice
-- Big Data system demonstration
-
----
-
-## Author
+- Backend chỉ làm serving/API gateway, không xử lý raw pipeline
+- Cold path ghi kết quả tổng hợp vào MongoDB
+- Hot path ghi dữ liệu thời gian thực vào Redis
+- Frontend gọi backend qua API/WebSocket
