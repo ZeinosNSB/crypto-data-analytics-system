@@ -17,8 +17,9 @@ Hệ thống phân tích dữ liệu crypto theo kiến trúc Lambda:
 
 ```text
 .
-├─ backend/                  # Backend service (framework-agnostic)
-├─ frontend-nextjs/          # Frontend Next.js
+├─ apps/                  
+│  ├─ api/              # API gateway
+│  └─ web/              # Next.js app
 ├─ ingestion/
 │  └─ collector/             # CCXT producer -> Kafka
 ├─ processing/

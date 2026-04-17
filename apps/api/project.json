@@ -1,0 +1,75 @@
+{
+  "name": "api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/api/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:api"],
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "platform": "node",
+        "outputPath": "dist/apps/api",
+        "format": ["esm"],
+        "bundle": true,
+        "external": ["bun"],
+        "main": "apps/api/src/index.ts",
+        "tsConfig": "apps/api/tsconfig.json",
+        "generatePackageJson": true,
+        "esbuildOptions": {
+          "sourcemap": true,
+          "treeShaking": true,
+          "keepNames": true,
+          "logLevel": "info"
+        }
+      },
+      "configurations": {
+        "development": {
+          "esbuildOptions": {
+            "sourcemap": true,
+            "minify": false,
+            "treeShaking": false
+          }
+        },
+        "production": {
+          "esbuildOptions": {
+            "sourcemap": false,
+            "minify": true,
+            "treeShaking": true,
+            "legalComments": "none",
+            "keepNames": false
+          }
+        }
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "defaultConfiguration": "development",
+      "options": {
+        "command": "bun run dist/apps/api/index.js",
+        "cwd": "{workspaceRoot}"
+      },
+      "dependsOn": ["build"],
+      "configurations": {
+        "development": {
+          "command": "bun --watch run dist/apps/api/index.js"
+        },
+        "production": {
+          "command": "bun run dist/apps/api/index.js"
+        }
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bun --watch run apps/api/src/index.ts",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "container": {
+      "dependsOn": ["build", "^build", { "projects": ["worker"], "target": "build" }]
+    }
+  }
+}
