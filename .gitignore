@@ -29,6 +29,7 @@ venv/
 
 # Node / Next.js
 node_modules/
+.pnpm-store/
 .next/
 out/
 dist/
@@ -46,3 +47,7 @@ npm-debug.log
 yarn-error.log
 testem.log
 /typings
+
+# Spark / streaming local runtime artifacts
+checkpoint/
+**/checkpoint/

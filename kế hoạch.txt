@@ -10,7 +10,7 @@ MỤC TIÊU : Hoàn thành hệ thống Lambda Architecture từ Ingestion đế
 --------------------------------------------------------------------------------
 [1] TEAM LEAD / DEVOPS (Tên: Trần Hoàng Dương)
     - Trách nhiệm: Quản lý hạ tầng Docker, Kubernetes, Helm, Kafka, Monitoring.
-[2] DATA INGESTION ENGINEER (Tên: ...........)
+[2] DATA INGESTION ENGINEER (Tên: Dương Quang Trung)
     - Trách nhiệm: Code Python (CCXT), lấy data Binance, đẩy vào Kafka Producer.
 [3] BATCH DATA ENGINEER (Tên: Nguyễn Hoàng Duy)
     - Trách nhiệm: MinIO, PySpark Batch (Cold path), ghi data vào MongoDB, ML.

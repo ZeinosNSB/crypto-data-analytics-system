@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "exchange": "binance",
+  "event_type": "trade",
+  "symbol": "BTCUSDT",
+  "event_time": 1713542400123,
+  "ingest_time": 1713542400456,
+  "price": "65234.12000000",
+  "quantity": "0.01500000",
+  "trade_id": 1234567890,
+  "is_buyer_maker": false,
+  "bid_price": null,
+  "bid_qty": null,
+  "ask_price": null,
+  "ask_qty": null,
+  "interval": null,
+  "source": "ws_trade"
+}

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crypto-data-analytics-system.local/contracts/market-event/v1",
+  "title": "MarketEventV1",
+  "description": "Canonical market event contract for Binance analytics pipeline.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "exchange",
+    "event_type",
+    "symbol",
+    "event_time",
+    "ingest_time",
+    "price",
+    "quantity",
+    "source"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Contract version used by all modules."
+    },
+    "exchange": {
+      "type": "string",
+      "enum": ["binance"],
+      "description": "Source exchange name."
+    },
+    "event_type": {
+      "type": "string",
+      "enum": ["trade", "book_ticker", "kline"],
+      "description": "Type of market event."
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z0-9]{5,20}$",
+      "description": "Trading pair symbol, for example BTCUSDT."
+    },
+    "event_time": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Event timestamp from source in epoch milliseconds."
+    },
+    "ingest_time": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Collector timestamp in epoch milliseconds."
+    },
+    "price": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Price value encoded as decimal string for precision safety."
+    },
+    "quantity": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Quantity value encoded as decimal string for precision safety."
+    },
+    "trade_id": {
+      "type": ["integer", "string", "null"],
+      "description": "Trade id when available from source."
+    },
+    "is_buyer_maker": {
+      "type": ["boolean", "null"],
+      "description": "Binance trade side flag when available."
+    },
+    "bid_price": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Best bid price when event_type is book_ticker."
+    },
+    "bid_qty": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Best bid quantity when event_type is book_ticker."
+    },
+    "ask_price": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Best ask price when event_type is book_ticker."
+    },
+    "ask_qty": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Best ask quantity when event_type is book_ticker."
+    },
+    "interval": {
+      "type": ["string", "null"],
+      "description": "Kline interval such as 1m, 5m."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["ws_trade", "ws_book_ticker", "ws_kline", "rest"],
+      "description": "Ingestion source channel."
+    }
+  }
+}
