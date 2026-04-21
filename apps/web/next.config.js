@@ -1,7 +1,7 @@
 //@ts-check
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { composePlugins, withNx } = require('@nx/next');
+const { composePlugins, withNx } = require('@nx/next')
 
 /**
  * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
@@ -14,14 +14,22 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'thesvg.org'
+      }
+    ]
+  },
   // Use this to set Nx-specific options
   // See: https://nx.dev/recipes/next/next-config-setup
-  nx: {},
-};
+  nx: {}
+}
 
 const plugins = [
   // Add more Next.js plugins to this list if needed.
-  withNx,
-];
+  withNx
+]
 
-module.exports = composePlugins(...plugins)(nextConfig);
+module.exports = composePlugins(...plugins)(nextConfig)
