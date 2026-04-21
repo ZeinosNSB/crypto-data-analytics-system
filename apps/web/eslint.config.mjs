@@ -34,6 +34,7 @@ export default [
     settings: { react: { version: 'detect' } },
     rules: {
       ...pluginReactHooks.configs.recommended.rules,
+      'react/prop-types': 'off',
       'react/react-in-jsx-scope': 'off',
       'react-hooks/exhaustive-deps': 'warn',
       'react-hooks/incompatible-library': 'off',
