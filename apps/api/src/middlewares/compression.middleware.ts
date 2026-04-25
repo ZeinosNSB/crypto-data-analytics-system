@@ -20,7 +20,7 @@ export const compression = (
     threshold: 1024
   }
 ) => {
-  const app = new Elysia({ name: 'elysia-compress' }).onAfterHandle(async ctx => {
+  const app = new Elysia({ name: 'elysia-compress' }).onAfterHandle(ctx => {
     const clientEncodings = ctx.headers['accept-encoding']?.split(', ') || []
     const encoding = options.encodings.find(enc => clientEncodings.includes(enc))
     if (!encoding || !isValidEncoding(encoding)) {
