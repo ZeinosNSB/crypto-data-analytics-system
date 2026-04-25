@@ -72,20 +72,21 @@ class StreamingApp:
         # Filter empty lines
         valid_lines = lines.filter(lambda x: len(x.strip()) > 0)
         
-        # Count lines and print statistics
-        valid_lines.foreachRDD(self._process_batch)
+        # Use static callback to avoid capturing StreamingApp instance in workers.
+        valid_lines.foreachRDD(StreamingApp._process_batch)
         
         return self.ssc
     
-    def _process_batch(self, rdd):
+    @staticmethod
+    def _process_batch(rdd):
         """
         Process each batch: count and log lines.
         
         Args:
             rdd: Spark RDD from current batch
         """
-        if rdd.count() > 0:
-            count = rdd.count()
+        count = rdd.count()
+        if count > 0:
             print(f"\n>>> Batch received: {count} line(s)")
             
             # Show sample data

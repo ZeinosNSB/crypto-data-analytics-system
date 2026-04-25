@@ -15,6 +15,7 @@ services:
       - "4000:4000"
     volumes:
       - ./:/workspace
+      - workspace_node_modules:/workspace/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
     depends_on:
       kafka:
@@ -43,6 +44,7 @@ services:
       - "3000:3000"
     volumes:
       - ./:/workspace
+      - workspace_node_modules:/workspace/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
     depends_on:
       api:
@@ -51,14 +53,16 @@ services:
       - crypto_net
 
   batch:
-    image: python:3.10-slim
+    build:
+      context: .
+      dockerfile: processing/batch/Dockerfile
     working_dir: /workspace
-    command: >
-      sh -lc "apt-get update &&
-      apt-get install -y --no-install-recommends openjdk-21-jre-headless procps &&
-      rm -rf /var/lib/apt/lists/* &&
-      pip install --no-cache-dir pyspark==3.5.1 &&
-      python processing/batch/pyspark_project/read_json.py"
+    command: python processing/batch/pyspark_project/read_json.py
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: market_events
+      KAFKA_STARTING_OFFSETS: earliest
+      KAFKA_ENDING_OFFSETS: latest
     volumes:
       - ./:/workspace
     networks:
@@ -66,14 +70,11 @@ services:
     restart: "no"
 
   streaming:
-    image: python:3.10-slim
+    build:
+      context: .
+      dockerfile: processing/streaming/Dockerfile
     working_dir: /workspace
-    command: >
-      sh -lc "apt-get update &&
-      apt-get install -y --no-install-recommends openjdk-21-jre-headless procps &&
-      rm -rf /var/lib/apt/lists/* &&
-      pip install --no-cache-dir -r processing/streaming/requirements.txt &&
-      python processing/streaming/src/streaming_app.py"
+    command: python processing/streaming/src/streaming_app.py
     volumes:
       - ./:/workspace
     ports:
@@ -86,8 +87,26 @@ services:
     networks:
       - crypto_net
 
+  ingestion:
+    build:
+      context: ./ingestion/collector
+      dockerfile: DockerFile
+    profiles:
+      - ingestion
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: market_events
+      SYMBOL: BTC/USDT
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - crypto_net
+    restart: unless-stopped
+
 volumes:
   pnpm_store:
+  workspace_node_modules:
 
 networks:
   crypto_net:

@@ -51,3 +51,8 @@ testem.log
 # Spark / streaming local runtime artifacts
 checkpoint/
 **/checkpoint/
+processing/batch/pyspark_project/output/
+**/output/parquet/
+
+cách chạy dự án.txt
+week1_infra_guide.md
