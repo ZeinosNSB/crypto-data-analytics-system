@@ -57,14 +57,48 @@ services:
       context: .
       dockerfile: processing/batch/Dockerfile
     working_dir: /workspace
-    command: python processing/batch/pyspark_project/read_json.py
+    command: python processing/batch/pyspark_project/kafka_to_minio.py
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: market_events
       KAFKA_STARTING_OFFSETS: earliest
       KAFKA_ENDING_OFFSETS: latest
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      RAW_EVENTS_PATH: s3a://${MINIO_BUCKET}/raw/market_events
     volumes:
       - ./:/workspace
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - crypto_net
+    restart: "no"
+
+  batch-volume-24h:
+    build:
+      context: .
+      dockerfile: processing/batch/Dockerfile
+    working_dir: /workspace
+    command: python processing/batch/pyspark_project/volume_24h.py --use-max-event-time
+    profiles:
+      - batch
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      RAW_EVENTS_PATH: s3a://${MINIO_BUCKET}/raw/market_events
+      VOLUME_24H_OUTPUT_PATH: s3a://${MINIO_BUCKET}/aggregates/volume_24h
+    volumes:
+      - ./:/workspace
+    depends_on:
+      minio:
+        condition: service_healthy
     networks:
       - crypto_net
     restart: "no"
