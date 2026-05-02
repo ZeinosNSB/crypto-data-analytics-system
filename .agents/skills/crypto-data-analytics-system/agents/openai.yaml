@@ -1,0 +1,6 @@
+interface:
+  display_name: "Crypto Data Analytics System"
+  short_description: "Repo-specific patterns and workflows for crypto-data-analytics-system"
+  default_prompt: "Use the crypto-data-analytics-system repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
