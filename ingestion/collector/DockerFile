@@ -1,6 +1,16 @@
-FROM python:3.9-slim
+# Dùng bản Node alpine cho nhẹ
+FROM node:18-alpine
+
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy package và cài đặt
+COPY package*.json ./
+RUN npm install --production
+
+# Copy toàn bộ code vào
 COPY . .
-CMD ["python", "main.py"]
+
+# Mở port 3000 để K8s/Prometheus có thể gọi vào /health và /metrics
+EXPOSE 3000
+
+CMD ["node", "index.js"]
