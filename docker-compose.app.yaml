@@ -94,7 +94,7 @@ services:
     profiles:
       - ingestion
     environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_BROKER: kafka:9092
       KAFKA_TOPIC: market_events
       SYMBOL: BTC/USDT
     depends_on:
