@@ -1,7 +1,7 @@
-# Spark Streaming - Hot Path Processing
+# Kafka Streaming - Hot Path Processing
 
 ## Overview
-Xử lý hot path theo thời gian thực. **Week 1**: Khởi tạo project Spark Streaming, viết hàm đếm số dòng từ console.
+Xử lý hot path theo thời gian thực. **Week 1**: Consume `market_events` từ Kafka, tính OHLC 1m, ghi Redis và phát JSON alert giá.
 
 **Team Member:** Ngô Thành Nam (Streaming Data Engineer)
 
@@ -9,50 +9,53 @@ Xử lý hot path theo thời gian thực. **Week 1**: Khởi tạo project Spar
 ```
 Socket/Console Input
     ↓
-Spark Streaming (DStream API)
-    ├─ Parse lines
-    ├─ Filter empty
-    └─ Count lines
+  Python hot-path processor
+    ├─ Parse JSON
+    ├─ Validate contract v1
+    ├─ Build 1m OHLC state
+    ├─ Write Redis snapshot/history
+    └─ Emit price alert JSON
     ↓
-Print to Console
+Redis + Console
 ```
 
 ## Tech Stack
-- **Spark Structured Streaming**: Real-time processing engine
+  - **Python Kafka Consumer**: Real-time hot-path loop
 - **Kafka**: Message broker (source)
-- **Redis**: Hot cache (sink)
+  - **Redis**: Hot cache for latest candles and alerts
 - **Python**: Application code
 - **jsonschema**: Data validation
+   - **redis**: Redis client
 
 ## Week 1: Project Initialization & Setup ✅
 
 ### ✅ Deliverables Completed
 - [x] Data contract definition (`contract.json`) - Unified schema
-- [x] Spark Structured Streaming application (`streaming_app.py`)
-- [x] OHLC windowing implementation (1-minute candles)
-- [x] Redis output writer (foreachBatch)
-- [x] Data validation utilities (`utils.py`)
-- [x] Environment configuration (`.env.example`)
+- [x] Kafka consumer application (`streaming_app.py`)
+- [x] Contract validation against `docs/contracts/contract.v1.json`
+- [x] 1-minute OHLC aggregation for trade events
+- [x] Redis candle snapshots and history list
+- [x] Price alert JSON emitted to Redis list/channel
+- [x] Environment configuration via `.env`
 - [x] Dependencies specification (`requirements.txt`)
 
 ### 🔄 Architecture Updates (vs. Original Plan)
 | Component | Original | Updated |
 |-----------|----------|---------|
-| Streaming API | DStream (RDD-based) | **Structured Streaming (DataFrame)** |
-| Data Source | Socket (localhost:9999) | **Kafka Topic** |
-| Windowing | Manual batching | **Native window() function** |
+| Streaming API | Socket demo | **Kafka consumer loop** |
+| Data Source | localhost:9999 | **Kafka topic `market_events`** |
+| Data Shape | Raw lines | **JSON contract v1** |
 | Output | Console only | **Redis + Console** |
-| Window Size | N/A | **1 minute (configurable)** |
+| Validation | None | **JSON Schema validation** |
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 ```
 ✓ Python 3.9+
-✓ Java 11+ (for Spark)
-✓ Spark 3.5.0
 ✓ Kafka 3.x
 ✓ Redis 7.x
+✓ Python 3.9+
 ✓ Docker Compose (recommended)
 ```
 
@@ -70,12 +73,12 @@ pip install -r requirements.txt
 
 # 4. Configure environment
 cp .env.example .env
-# Edit .env with your Kafka/Redis addresses
+# Edit .env with your Kafka broker and topic
 ```
 
 ### Run the Application
 
-**Terminal 1: Start Spark Streaming App**
+**Terminal 1: Start streaming consumer**
 ```bash
 cd src
 python streaming_app.py
@@ -84,93 +87,94 @@ python streaming_app.py
 You should see:
 ```
 ======================================================================
-SPARK STREAMING - LINE COUNTING FROM CONSOLE
+STREAMING - KAFKA CONSUMER FOR MARKET EVENTS
 ======================================================================
-Batch Interval: 2 seconds
+Kafka broker : localhost:9094
+Kafka topic  : market_events
+Group id     : streaming-processor
 
-Listening on localhost:9999
-To send data, open another terminal and run:
-  nc localhost 9999
-Or on Windows:
-  powershell -Command "New-Object Net.Sockets.TcpClient('localhost',9999)"
-
-Then type data and press Enter (Ctrl+C to stop)
+Waiting for events from ingestion... Ctrl+C to stop
 ======================================================================
 ```
 
-**Terminal 2: Send Test Data**
+**Terminal 2: Run ingestion collector**
 
-On Linux/macOS:
-```bash
-nc localhost 9999
-```
+Start the collector so it publishes `market_events` into Kafka. The streaming app will consume and print summaries automatically.
 
-On Windows (PowerShell):
-```bash
-$tcp = New-Object Net.Sockets.TcpClient('localhost', 9999)
-$stream = $tcp.GetStream()
-$writer = New-Object System.IO.StreamWriter($stream)
-$writer.WriteLine('{"symbol":"BTCUSDT","price":45000.50}')
-$writer.Flush()
-```
+### Redis Keys
 
-Then type data and press Enter:
-```
-{"symbol":"BTCUSDT","price":45000.50}
-{"symbol":"ETHUSDT","price":2250.75}
-{"symbol":"BNBUSDT","price":320.00}
-```
-
-Expected output on Terminal 1:
-```
->>> Batch received: 3 line(s)
-Sample data:
-  1. {"symbol":"BTCUSDT","price":45000.50}
-  2. {"symbol":"ETHUSDT","price":2250.75}
-  3. {"symbol":"BNBUSDT","price":320.00}
-```
+- Latest candle: `hotpath:ohlc:1m:<SYMBOL>:latest`
+- Current candle snapshot: `hotpath:ohlc:1m:<SYMBOL>:current`
+- Candle history list: `hotpath:ohlc:1m:<SYMBOL>:history`
+- Alert list: `hotpath:alerts`
+- Alert channel: `hotpath:alerts:channel`
 
 ## Data Structure (contract.json)
 All messages flowing through this system must match the contract schema:
 ```json
 {
+  "schema_version": 1,
+  "exchange": "binance",
+  "event_type": "trade",
   "symbol": "BTCUSDT",
-  "price": 45000.50,
-  "volume": 10.5,
-  "timestamp": 1692864000000,
-  "ask": 45001.00,
-  "bid": 45000.00
+  "event_time": 1692864000000,
+  "ingest_time": 1692864000123,
+  "price": "45000.50",
+  "quantity": "0.01000000",
+  "source": "ws_trade"
+}
+```
+
+## Alert JSON
+
+When a 1-minute candle moves enough to cross the configured threshold, the app pushes an alert payload like this to Redis. The canonical schema lives in [docs/contracts/price-alert.v1.json](../../docs/contracts/price-alert.v1.json).
+
+```json
+{
+  "schema_version": 1,
+  "type": "price_alert",
+  "alert_type": "price_move",
+  "severity": "warning",
+  "exchange": "binance",
+  "symbol": "BTCUSDT",
+  "interval": "1m",
+  "bucket_start": 1692864000000,
+  "bucket_end": 1692864059999,
+  "open": "45000.5",
+  "close": "45280.1",
+  "change_abs": "279.6",
+  "change_pct": "0.62",
+  "direction": "up",
+  "threshold_pct": "0.5",
+  "trade_count": 124,
+  "source": "stream_price_alert_1m",
+  "message": "BTCUSDT moved 0.62% on 1m candle",
+  "created_at": 1692864060123
 }
 ```
 
 ## Troubleshooting
 
-### "No module named 'pyspark'"
+### "No module named 'kafka'"
 ```bash
 pip install -r requirements.txt
 ```
 
-### "Connection refused" on localhost:9999
-The app is listening on port 9999. Make sure you're connecting from another terminal:
-```bash
-nc localhost 9999
-```
+### "Connection refused" on localhost:9094
+The consumer expects Kafka to be running on `localhost:9094` by default. Update `KAFKA_BROKER` if your environment uses a different port.
 
-### "Address already in use"
-Port 9999 is already in use. Either:
-1. Stop other processes using 9999
-2. Or modify the port in `streaming_app.py` line: `lines = self.ssc.socketTextStream("localhost", 9999)`
+### No events printed
+Check that the ingestion collector is running and that both services point to the same broker and topic.
 
-### Checkpoint errors
-Checkpoints can get corrupted. Safe to delete on development:
+### "No module named 'redis'"
 ```bash
-rm -rf checkpoint/
+pip install -r requirements.txt
 ```
 
 ## References
-- [Spark Streaming Guide](https://spark.apache.org/docs/latest/streaming-programming-guide.html)
-- [DStream vs Structured Streaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html)
-- [Socket Source](https://spark.apache.org/docs/latest/streaming-programming-guide.html#tcp-datasets)
+- [Kafka Python client](https://kafka-python.readthedocs.io/)
+- [JSON Schema](https://json-schema.org/)
+- [Contract v1](../../docs/contracts/contract.v1.json)
 
 ## Status
 - **Week 1:** ✅ Complete  
