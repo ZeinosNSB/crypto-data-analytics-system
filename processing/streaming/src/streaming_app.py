@@ -234,7 +234,9 @@ class StreamingApp:
         emitted_at_ms = _now_ms()
         payload = candle.to_payload(status="partial", emitted_at_ms=emitted_at_ms)
         current_key = self._redis_key_for_symbol(candle.symbol, "current")
+        encoded = json.dumps(payload, ensure_ascii=False)
         self._write_redis_json(current_key, payload)
+        self.redis.publish(self.redis_ohlc_prefix + ":channel", encoded)
         logger.info(
             "[%s] partial candle updated open=%s high=%s low=%s close=%s volume=%s trades=%s",
             candle.symbol,

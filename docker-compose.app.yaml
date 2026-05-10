@@ -11,6 +11,7 @@ services:
       PORT: 4000
       PREFIX: /api/v1
       CLIENT_URL: http://web:3000
+      REDIS_URL: redis://redis:6379
     ports:
       - "4000:4000"
     volumes:
@@ -39,7 +40,7 @@ services:
     environment:
       NEXT_PUBLIC_URL: http://localhost:3000
       NEXT_PUBLIC_API_ENDPOINT: http://localhost:4000/api/v1
-      NEXT_PUBLIC_WEBSOCKET_ENDPOINT: ws://localhost:4000
+      NEXT_PUBLIC_WEBSOCKET_ENDPOINT: ws://localhost:4000/api/v1
     ports:
       - "3000:3000"
     volumes:
@@ -109,6 +110,11 @@ services:
       dockerfile: processing/streaming/Dockerfile
     working_dir: /workspace
     command: python processing/streaming/src/streaming_app.py
+#    environment:
+#      KAFKA_BROKER: kafka:9092
+#      KAFKA_TOPIC: market_events
+#      REDIS_HOST: redis
+#      REDIS_PORT: "6379"
     volumes:
       - ./:/workspace
     ports:

@@ -1,6 +1,6 @@
 'use client'
 
-import { GithubLogoIcon } from '@phosphor-icons/react/ssr'
+import { GithubLogoIcon, TerminalIcon } from '@phosphor-icons/react/ssr'
 import { Button } from '@workspace/web/components/ui/button'
 import { AnimatePresence, motion } from 'motion/react'
 import Image from 'next/image'
@@ -104,7 +104,7 @@ export default function Header() {
             const isActive = activeSection === href
             const isHighlighted = highlight === href
             return (
-              <a
+              <Link
                 key={href}
                 href={href}
                 onClick={e => handleNavClick(e, href)}
@@ -142,16 +142,28 @@ export default function Header() {
                     }}
                   />
                 )}
-              </a>
+              </Link>
             )
           })}
         </nav>
 
         {/* GitHub CTA */}
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-          <Link href='https://github.com/ZeinosNSB/crypto-data-analytics-system' className='hidden md:block'>
+        <motion.div className='flex items-center gap-2' whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
+          <Link
+            href='https://github.com/ZeinosNSB/crypto-data-analytics-system'
+            target='_blank'
+            className='hidden md:block'
+          >
             <Button variant='outline' size='sm' className='gap-2'>
-              <GithubLogoIcon className='h-4 w-4' /> GitHub
+              <GithubLogoIcon className='h-4 w-4' />
+              GitHub
+            </Button>
+          </Link>
+
+          <Link href='/terminal'>
+            <Button variant='outline' size='sm' className='gap-2'>
+              <TerminalIcon className='h-4 w-4' />
+              Dashboard
             </Button>
           </Link>
         </motion.div>
