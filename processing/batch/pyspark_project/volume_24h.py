@@ -18,6 +18,16 @@ from pyspark.sql.types import DecimalType
 from common import create_spark_session, ensure_bucket_for_path, raw_events_path, volume_24h_output_path
 
 
+VOLUME_INPUT_COLUMNS = [
+    "exchange",
+    "symbol",
+    "event_type",
+    "event_timestamp",
+    "quantity_decimal",
+    "volume_quote",
+]
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Calculate rolling 24h trading volume from raw market-event Parquet data."
@@ -68,6 +78,15 @@ def parse_args():
     return parser.parse_args()
 
 
+def validate_args(args):
+    if args.lookback_hours <= 0:
+        raise ValueError("--lookback-hours must be greater than 0")
+
+
+def parse_symbols(value):
+    return [symbol.strip().upper() for symbol in value.split(",") if symbol.strip()]
+
+
 def parse_utc_datetime(value):
     normalized = value.strip()
     if normalized.endswith("Z"):
@@ -101,21 +120,22 @@ def resolve_window_end(raw_df, args):
 
 def main():
     args = parse_args()
+    validate_args(args)
+
     spark = create_spark_session(args.app_name)
     spark.sparkContext.setLogLevel(os.getenv("SPARK_LOG_LEVEL", "WARN"))
 
     try:
         ensure_bucket_for_path(args.output)
 
-        raw_df = spark.read.parquet(args.input)
-        trade_df = raw_df.filter(
+        trade_df = spark.read.parquet(args.input).select(*VOLUME_INPUT_COLUMNS).filter(
             (col("event_type") == "trade")
             & col("event_timestamp").isNotNull()
             & col("quantity_decimal").isNotNull()
             & col("volume_quote").isNotNull()
         )
 
-        symbols = [symbol.strip().upper() for symbol in args.symbols.split(",") if symbol.strip()]
+        symbols = parse_symbols(args.symbols)
         if symbols:
             trade_df = trade_df.filter(col("symbol").isin(symbols))
 
@@ -145,10 +165,14 @@ def main():
             )
             .withColumn("lookback_hours", lit(args.lookback_hours))
             .withColumn("computed_at", current_timestamp())
+            .cache()
         )
 
-        result_count = result_df.count()
-        result_df.write.mode(args.mode).partitionBy("symbol").parquet(args.output)
+        try:
+            result_count = result_df.count()
+            result_df.write.mode(args.mode).partitionBy("symbol").parquet(args.output)
+        finally:
+            result_df.unpersist()
 
         print(
             "Volume 24h completed: "
