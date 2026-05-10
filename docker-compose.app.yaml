@@ -111,11 +111,14 @@ services:
       dockerfile: processing/streaming/Dockerfile
     working_dir: /workspace
     command: python processing/streaming/src/streaming_app.py
-#    environment:
-#      KAFKA_BROKER: kafka:9092
-#      KAFKA_TOPIC: market_events
-#      REDIS_HOST: redis
-#      REDIS_PORT: "6379"
+    environment:
+      KAFKA_BROKER: kafka:9092
+      KAFKA_TOPIC: market_events
+      KAFKA_GROUP_ID: streaming-hot-path
+      AUTO_OFFSET_RESET: latest
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
     volumes:
       - ./:/workspace
     ports:
