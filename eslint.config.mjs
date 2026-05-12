@@ -150,5 +150,15 @@ export default [
         }
       ]
     }
+  },
+  /**
+   * Ingestion collector: plain Node/CommonJS (`require`), không nằm trong TS project của apps.
+   * Phải có tsconfig chứa file JS để `parserOptions.projectService` của typescript-eslint không fail.
+   */
+  {
+    files: ['ingestion/collector/**/*.js'],
+    rules: {
+      'import-x/no-commonjs': 'off'
+    }
   }
 ]

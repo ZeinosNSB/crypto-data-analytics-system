@@ -11,6 +11,7 @@ services:
       PORT: 4000
       PREFIX: /api/v1
       CLIENT_URL: http://web:3000
+      REDIS_URL: redis://redis:6379
     ports:
       - "4000:4000"
     volumes:
@@ -28,18 +29,19 @@ services:
       - crypto_net
 
   web:
-    image: node:20-alpine
+    image: node:24.11.0-alpine
     working_dir: /workspace
     command: >
       sh -lc "corepack enable &&
-      corepack prepare pnpm@latest --activate &&
+      corepack prepare pnpm@10.33.0 --activate &&
       pnpm install --frozen-lockfile &&
       rm -rf apps/web/.next &&
-      pnpm exec nx run web:dev -- --hostname 0.0.0.0 --port 3000"
+      cd apps/web &&
+      pnpm exec next dev --hostname 0.0.0.0 --port 3000"
     environment:
       NEXT_PUBLIC_URL: http://localhost:3000
       NEXT_PUBLIC_API_ENDPOINT: http://localhost:4000/api/v1
-      NEXT_PUBLIC_WEBSOCKET_ENDPOINT: ws://localhost:4000
+      NEXT_PUBLIC_WEBSOCKET_ENDPOINT: ws://localhost:4000/api/v1
     ports:
       - "3000:3000"
     volumes:
@@ -57,14 +59,48 @@ services:
       context: .
       dockerfile: processing/batch/Dockerfile
     working_dir: /workspace
-    command: python processing/batch/pyspark_project/read_json.py
+    command: python processing/batch/pyspark_project/kafka_to_minio.py
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: market_events
       KAFKA_STARTING_OFFSETS: earliest
       KAFKA_ENDING_OFFSETS: latest
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      RAW_EVENTS_PATH: s3a://${MINIO_BUCKET}/raw/market_events
     volumes:
       - ./:/workspace
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - crypto_net
+    restart: "no"
+
+  batch-volume-24h:
+    build:
+      context: .
+      dockerfile: processing/batch/Dockerfile
+    working_dir: /workspace
+    command: python processing/batch/pyspark_project/volume_24h.py --use-max-event-time
+    profiles:
+      - batch
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      RAW_EVENTS_PATH: s3a://${MINIO_BUCKET}/raw/market_events
+      VOLUME_24H_OUTPUT_PATH: s3a://${MINIO_BUCKET}/aggregates/volume_24h
+    volumes:
+      - ./:/workspace
+    depends_on:
+      minio:
+        condition: service_healthy
     networks:
       - crypto_net
     restart: "no"
@@ -75,6 +111,14 @@ services:
       dockerfile: processing/streaming/Dockerfile
     working_dir: /workspace
     command: python processing/streaming/src/streaming_app.py
+    environment:
+      KAFKA_BROKER: kafka:9092
+      KAFKA_TOPIC: market_events
+      KAFKA_GROUP_ID: streaming-hot-path
+      AUTO_OFFSET_RESET: latest
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
     volumes:
       - ./:/workspace
     ports:
@@ -94,7 +138,7 @@ services:
     profiles:
       - ingestion
     environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_BROKER: kafka:9092
       KAFKA_TOPIC: market_events
       SYMBOL: BTC/USDT
     depends_on:

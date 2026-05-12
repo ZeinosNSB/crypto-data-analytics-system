@@ -9,7 +9,8 @@ export const envConfig = createEnv({
       v.picklist(['true', 'false']),
       v.transform(value => value === 'true')
     ),
-    CLIENT_URL: v.string()
+    CLIENT_URL: v.string(),
+    REDIS_URL: v.string()
   },
   runtimeEnv: process.env
 })

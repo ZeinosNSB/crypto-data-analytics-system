@@ -78,6 +78,45 @@ services:
     networks:
       - crypto_net
 
+  minio:
+    image: minio/minio:latest
+    container_name: ${MINIO_CONTAINER_NAME}
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "${MINIO_EXTERNAL_PORT}:9000"
+      - "${MINIO_CONSOLE_EXTERNAL_PORT}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    networks:
+      - crypto_net
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+      mc mb -p local/$${MINIO_BUCKET} || true
+      "
+    networks:
+      - crypto_net
+
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2
     container_name: ${KAFKA_UI_CONTAINER_NAME}
@@ -97,6 +136,7 @@ volumes:
   kafka_data:
   redis_data:
   mongo_data:
+  minio_data:
 
 networks:
   crypto_net:
