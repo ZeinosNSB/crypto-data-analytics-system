@@ -72,6 +72,7 @@ services:
       RAW_EVENTS_PATH: s3a://${MINIO_BUCKET}/raw/market_events
     volumes:
       - ./:/workspace
+      - spark_ivy_cache:/root/.ivy2
     depends_on:
       kafka:
         condition: service_healthy
@@ -98,8 +99,42 @@ services:
       VOLUME_24H_OUTPUT_PATH: s3a://${MINIO_BUCKET}/aggregates/volume_24h
     volumes:
       - ./:/workspace
+      - spark_ivy_cache:/root/.ivy2
     depends_on:
       minio:
+        condition: service_healthy
+    networks:
+      - crypto_net
+    restart: "no"
+
+  batch-volume-24h-mongo:
+    build:
+      context: .
+      dockerfile: processing/batch/Dockerfile
+    working_dir: /workspace
+    command: python processing/batch/pyspark_project/volume_24h_to_mongodb.py --use-max-event-time
+    profiles:
+      - batch
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      RAW_EVENTS_PATH: s3a://${MINIO_BUCKET}/raw/market_events
+      MONGO_HOST: mongodb
+      MONGO_PORT: "27017"
+      MONGO_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_DATABASE: ${MONGO_DEFAULT_DATABASE}
+      MONGO_AUTH_SOURCE: admin
+      MONGO_COLLECTION_VOLUME_24H: volume_24h
+    volumes:
+      - ./:/workspace
+      - spark_ivy_cache:/root/.ivy2
+    depends_on:
+      minio:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     networks:
       - crypto_net
@@ -150,6 +185,7 @@ services:
 
 volumes:
   pnpm_store:
+  spark_ivy_cache:
   workspace_node_modules:
 
 networks:

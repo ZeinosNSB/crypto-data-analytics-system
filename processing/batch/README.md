@@ -4,6 +4,7 @@ Cold path hien tai:
 
 - `kafka_to_minio.py`: doc topic Kafka `market_events`, parse contract v1, ghi raw Parquet xuong MinIO.
 - `volume_24h.py`: doc raw Parquet trong MinIO va tinh volume 24h theo `symbol`.
+- `volume_24h_to_mongodb.py`: tai su dung logic tinh volume 24h va upsert ket qua vao MongoDB.
 
 ## MinIO layout
 
@@ -36,6 +37,16 @@ docker compose -f docker-compose.yaml -f docker-compose.app.yaml --profile batch
 
 Mac dinh job volume dung `--use-max-event-time` de tien demo/backfill: cua so 24h ket thuc tai event moi nhat trong raw data.
 
+Ghi ket qua Volume 24h vao MongoDB:
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.app.yaml --profile batch build batch-volume-24h-mongo
+docker compose -f docker-compose.yaml -f docker-compose.app.yaml --profile batch run --rm batch-volume-24h-mongo
+```
+
+MongoDB document duoc upsert theo `_id` on dinh:
+`exchange:symbol:lookback_hours:window_start:window_end`.
+
 ## Environment
 
 ```text
@@ -47,5 +58,11 @@ MINIO_ROOT_PASSWORD=minioadmin
 MINIO_BUCKET=crypto-lake
 RAW_EVENTS_PATH=s3a://crypto-lake/raw/market_events
 VOLUME_24H_OUTPUT_PATH=s3a://crypto-lake/aggregates/volume_24h
+MONGO_HOST=mongodb
+MONGO_PORT=27017
+MONGO_ROOT_USERNAME=admin
+MONGO_ROOT_PASSWORD=admin123
+MONGO_DATABASE=crypto_analytics
+MONGO_AUTH_SOURCE=admin
+MONGO_COLLECTION_VOLUME_24H=volume_24h
 ```
-
