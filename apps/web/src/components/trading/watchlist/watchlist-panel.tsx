@@ -3,7 +3,7 @@
 import { MagnifyingGlassIcon, StarIcon } from '@phosphor-icons/react'
 import { useChartStore } from '@workspace/web/stores/chart.store'
 import { useWatchlistStore } from '@workspace/web/stores/watchlist.store'
-import { formatCurrency } from '@workspace/web/utils/chart.utils'
+import { formatCurrency } from '@workspace/web/utils/chart'
 import React, { useState } from 'react'
 
 export function WatchlistPanel() {

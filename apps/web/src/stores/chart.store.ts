@@ -1,4 +1,4 @@
-import { toChartTime } from '@workspace/web/utils/chart.utils'
+import { toChartTime } from '@workspace/web/utils/chart'
 import { create } from 'zustand'
 import type { CandleData, OhlcCandlePayload } from '@workspace/web/types/market.types'
 

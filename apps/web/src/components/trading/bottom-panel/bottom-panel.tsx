@@ -1,7 +1,28 @@
 'use client'
 
+import { Volume24hPanel } from '@workspace/web/components/trading/bottom-panel/volume24h-panel'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workspace/web/components/ui/table'
 import { useUIStore } from '@workspace/web/stores/ui.store'
 import React from 'react'
+
+const POSITION_HEADERS = [
+  'Symbol',
+  'Size',
+  'Entry Price',
+  'Mark Price',
+  'Liq. Price',
+  'Margin Ratio',
+  'Margin',
+  'PNL (ROE%)',
+  'Action'
+] as const
+
+const EMPTY_MESSAGES: Record<string, string> = {
+  positions: 'You have no open positions.',
+  orders: 'You have no open orders.',
+  history: 'No order history.',
+  assets: 'No assets to display.'
+}
 
 export function BottomPanel() {
   const activeBottomTab = useUIStore(state => state.activeBottomTab)
@@ -11,7 +32,8 @@ export function BottomPanel() {
     { id: 'positions', label: 'Positions (0)' },
     { id: 'orders', label: 'Open Orders (0)' },
     { id: 'history', label: 'Order History' },
-    { id: 'assets', label: 'Assets' }
+    { id: 'assets', label: 'Assets' },
+    { id: 'volume', label: '24h Volume' }
   ] as const
 
   return (
@@ -35,28 +57,28 @@ export function BottomPanel() {
 
       {/* Content Area */}
       <div className='flex-1 overflow-auto'>
-        <table className='w-full border-collapse text-left'>
-          <thead className='sticky top-0 z-10 border-b border-slate-800/50 bg-[#0f1116] text-xs text-slate-500'>
-            <tr>
-              <th className='px-4 py-2 font-medium whitespace-nowrap'>Symbol</th>
-              <th className='px-4 py-2 font-medium whitespace-nowrap'>Size</th>
-              <th className='px-4 py-2 font-medium whitespace-nowrap'>Entry Price</th>
-              <th className='px-4 py-2 font-medium whitespace-nowrap'>Mark Price</th>
-              <th className='px-4 py-2 font-medium whitespace-nowrap'>Liq. Price</th>
-              <th className='px-4 py-2 font-medium whitespace-nowrap'>Margin Ratio</th>
-              <th className='px-4 py-2 font-medium whitespace-nowrap'>Margin</th>
-              <th className='px-4 py-2 text-right font-medium whitespace-nowrap'>PNL (ROE%)</th>
-              <th className='px-4 py-2 text-right font-medium whitespace-nowrap'>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colSpan={9} className='py-8 text-center text-sm text-slate-500'>
-                You have no open positions.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        {activeBottomTab === 'volume' ? (
+          <Volume24hPanel />
+        ) : (
+          <Table>
+            <TableHeader className='sticky top-0 z-10 bg-[#0f1116]'>
+              <TableRow className='border-slate-800/50 hover:bg-transparent'>
+                {POSITION_HEADERS.map(header => (
+                  <TableHead key={header} className='text-slate-500'>
+                    {header}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow className='border-0 hover:bg-transparent'>
+                <TableCell colSpan={POSITION_HEADERS.length} className='py-8 text-center text-sm text-slate-500'>
+                  {EMPTY_MESSAGES[activeBottomTab] ?? ''}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        )}
       </div>
     </div>
   )

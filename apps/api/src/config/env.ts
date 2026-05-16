@@ -10,7 +10,8 @@ export const envConfig = createEnv({
       v.transform(value => value === 'true')
     ),
     CLIENT_URL: v.string(),
-    REDIS_URL: v.string()
+    REDIS_URL: v.string(),
+    MONGO_URI: v.string()
   },
   runtimeEnv: process.env
 })

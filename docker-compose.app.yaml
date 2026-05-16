@@ -12,6 +12,7 @@ services:
       PREFIX: /api/v1
       CLIENT_URL: http://web:3000
       REDIS_URL: redis://redis:6379
+      MONGO_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DEFAULT_DATABASE}?authSource=admin
     ports:
       - "4000:4000"
     volumes:

@@ -4,12 +4,12 @@ interface UIState {
   sidebarOpen: boolean
   rightPanelOpen: boolean
   bottomPanelOpen: boolean
-  activeBottomTab: 'positions' | 'orders' | 'history' | 'assets'
+  activeBottomTab: 'positions' | 'orders' | 'history' | 'assets' | 'volume'
 
   toggleSidebar: () => void
   toggleRightPanel: () => void
   toggleBottomPanel: () => void
-  setActiveBottomTab: (tab: 'positions' | 'orders' | 'history' | 'assets') => void
+  setActiveBottomTab: (tab: 'positions' | 'orders' | 'history' | 'assets' | 'volume') => void
 }
 
 export const useUIStore = create<UIState>(set => ({

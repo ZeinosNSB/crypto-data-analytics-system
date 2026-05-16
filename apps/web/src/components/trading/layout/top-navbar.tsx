@@ -1,10 +1,12 @@
 'use client'
 
 import { WifiHighIcon, WifiSlashIcon } from '@phosphor-icons/react'
+import { useVolume24hBySymbol } from '@workspace/web/hooks/use-volume24h'
 import { useChartStore } from '@workspace/web/stores/chart.store'
 import { useMarketStore } from '@workspace/web/stores/market.store'
 import { useWebsocketStore } from '@workspace/web/stores/websocket.store'
-import { formatCurrency } from '@workspace/web/utils/chart.utils'
+import { formatCurrency } from '@workspace/web/utils/chart'
+import { formatVolume } from '@workspace/web/utils/format'
 import Image from 'next/image'
 import React from 'react'
 
@@ -12,6 +14,7 @@ export function TopNavbar() {
   const activeSymbol = useChartStore(state => state.activeSymbol)
   const stats = useMarketStore(state => state.stats[activeSymbol])
   const connectionState = useWebsocketStore(state => state.connectionState)
+  const { data: volumeData } = useVolume24hBySymbol(activeSymbol)
 
   const isUp = stats?.priceChangePercent ? stats.priceChangePercent >= 0 : true
   const priceColor = isUp ? 'text-green-500' : 'text-red-500'
@@ -61,8 +64,21 @@ export function TopNavbar() {
 
               <div className='hidden flex-col justify-center lg:flex'>
                 <span className='text-xs text-slate-500'>24h Vol(USDT)</span>
-                <span className='text-sm font-medium text-slate-200'>{formatCurrency(stats.volume, 0)}</span>
+                <span className='text-sm font-medium text-emerald-400'>
+                  {volumeData?.data
+                    ? `$${formatVolume(volumeData.data.volume_quote_24h)}`
+                    : formatCurrency(stats.volume, 0)}
+                </span>
               </div>
+
+              {volumeData?.data && (
+                <div className='hidden flex-col justify-center lg:flex'>
+                  <span className='text-xs text-slate-500'>24h Trades</span>
+                  <span className='text-sm font-medium text-slate-200'>
+                    {volumeData.data.trade_count_24h.toLocaleString()}
+                  </span>
+                </div>
+              )}
             </>
           ) : (
             <div className='animate-pulse text-sm text-slate-500'>Loading market data...</div>
