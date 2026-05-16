@@ -15,8 +15,7 @@ function createClient(): MongoClient {
     socketTimeoutMS: 45_000,
     connectTimeoutMS: 10_000,
     retryWrites: true,
-    retryReads: true,
-    compressors: ['zstd', 'snappy']
+    retryReads: true
   })
 }
 

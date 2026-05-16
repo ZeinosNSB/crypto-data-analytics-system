@@ -7,6 +7,7 @@ import { toChartTime } from '@workspace/web/utils/chart'
 import { useCallback, useEffect, useRef } from 'react'
 import useWebSocket, { ReadyState } from 'react-use-websocket'
 import type { OhlcCandlePayload } from '@workspace/web/types/market.types'
+import type { WatchlistSymbol } from '@workspace/web/types/market.types'
 import type { ConnectionState, WsClientMessage, WsServerMessage } from '@workspace/web/types/websocket.types'
 
 const WS_URL = envConfig.NEXT_PUBLIC_WEBSOCKET_ENDPOINT + '/ws'
@@ -31,24 +32,35 @@ function candlePayloadToChartCandle(payload: OhlcCandlePayload) {
 }
 
 function updateStoresFromCandle(symbol: string, payload: OhlcCandlePayload) {
-  const price = parseFloat(payload.close)
+  const open = parseFloat(payload.open)
+  const close = parseFloat(payload.close)
+  const high = parseFloat(payload.high)
+  const low = parseFloat(payload.low)
+  const volume = parseFloat(payload.volume)
+  const priceChange = close - open
+  const previousWatchlistPrice =
+    useWatchlistStore.getState().symbols.find((item: WatchlistSymbol) => item.symbol === symbol)?.lastPrice ?? 0
+  const changeBasePrice = previousWatchlistPrice > 0 ? previousWatchlistPrice : open
+  const changePercent = changeBasePrice !== 0 ? ((close - changeBasePrice) / changeBasePrice) * 100 : 0
+  const priceDelta = close - changeBasePrice
 
   useWatchlistStore.getState().updateSymbol(symbol, {
-    lastPrice: price,
-    volume24h: parseFloat(payload.volume)
+    lastPrice: close,
+    priceChange: priceDelta,
+    changePercent24h: changePercent,
+    volume24h: volume,
+    high24h: high,
+    low24h: low
   })
 
   useMarketStore.getState().setStats(symbol, {
     symbol,
-    lastPrice: price,
-    priceChange: parseFloat(payload.close) - parseFloat(payload.open),
-    priceChangePercent:
-      parseFloat(payload.open) !== 0
-        ? ((parseFloat(payload.close) - parseFloat(payload.open)) / parseFloat(payload.open)) * 100
-        : 0,
-    high: parseFloat(payload.high),
-    low: parseFloat(payload.low),
-    volume: parseFloat(payload.volume),
+    lastPrice: close,
+    priceChange,
+    priceChangePercent: changePercent,
+    high,
+    low,
+    volume,
     quoteVolume: 0
   })
 }
@@ -129,7 +141,7 @@ export function useMarketWebsocket(activeSymbol: string) {
   useEffect(() => {
     if (readyState !== ReadyState.OPEN) return
 
-    const watchlistSymbols = useWatchlistStore.getState().symbols.map(s => s.symbol)
+    const watchlistSymbols = useWatchlistStore.getState().symbols.map((s: WatchlistSymbol) => s.symbol)
 
     for (const sym of watchlistSymbols) {
       if (!subscribedRef.current.has(sym)) {

@@ -16,7 +16,7 @@ export const useUIStore = create<UIState>(set => ({
   sidebarOpen: true,
   rightPanelOpen: true,
   bottomPanelOpen: true,
-  activeBottomTab: 'positions',
+  activeBottomTab: 'volume',
 
   toggleSidebar: () => set(state => ({ sidebarOpen: !state.sidebarOpen })),
   toggleRightPanel: () => set(state => ({ rightPanelOpen: !state.rightPanelOpen })),

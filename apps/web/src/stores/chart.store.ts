@@ -26,6 +26,23 @@ function payloadToCandle(payload: OhlcCandlePayload): CandleData {
   }
 }
 
+function normalizeCandles(candles: Array<CandleData>): Array<CandleData> {
+  const sortedCandles = [...candles].sort((left, right) => Number(left.time) - Number(right.time))
+  const normalizedCandles: Array<CandleData> = []
+
+  for (const candle of sortedCandles) {
+    const lastCandle = normalizedCandles[normalizedCandles.length - 1]
+
+    if (lastCandle && lastCandle.time === candle.time) {
+      normalizedCandles[normalizedCandles.length - 1] = candle
+    } else {
+      normalizedCandles.push(candle)
+    }
+  }
+
+  return normalizedCandles
+}
+
 export const useChartStore = create<ChartState>(set => ({
   activeSymbol: 'BTCUSDT',
   activeTimeframe: '1m',
@@ -34,10 +51,13 @@ export const useChartStore = create<ChartState>(set => ({
 
   setActiveSymbol: symbol => set({ activeSymbol: symbol }),
   setActiveTimeframe: timeframe => set({ activeTimeframe: timeframe }),
-  setCandles: candles => set({ candles, currentCandle: candles[candles.length - 1] || null }),
+  setCandles: candles => {
+    const normalizedCandles = normalizeCandles(candles)
+    set({ candles: normalizedCandles, currentCandle: normalizedCandles[normalizedCandles.length - 1] || null })
+  },
 
   setHistoryFromBackend: payloads => {
-    const candles = payloads.map(payloadToCandle)
+    const candles = normalizeCandles(payloads.map(payloadToCandle))
     set({ candles, currentCandle: candles[candles.length - 1] || null })
   },
 

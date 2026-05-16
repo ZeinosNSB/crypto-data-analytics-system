@@ -9,7 +9,7 @@ import {
   useReactTable
 } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workspace/web/components/ui/table'
-import { useVolume24hList } from '@workspace/web/hooks/use-volume24h'
+import { useVolume24hBySymbol, useVolume24hList } from '@workspace/web/hooks/use-volume24h'
 import { useChartStore } from '@workspace/web/stores/chart.store'
 import { formatTradeCount, formatVolume } from '@workspace/web/utils/format'
 import dayjs from 'dayjs'
@@ -87,11 +87,27 @@ function SortIndicator({ direction }: { direction: false | 'asc' | 'desc' }) {
   )
 }
 
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className='flex items-center justify-between gap-4 border-b border-slate-800/60 py-2 last:border-b-0'>
+      <span className='text-xs text-slate-500'>{label}</span>
+      <span className='text-sm text-slate-100'>{value}</span>
+    </div>
+  )
+}
+
 export function Volume24hPanel() {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'volume_quote_24h', desc: true }])
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null)
 
   const setActiveSymbol = useChartStore(state => state.setActiveSymbol)
   const activeSymbol = useChartStore(state => state.activeSymbol)
+
+  const {
+    data: selectedVolume,
+    isLoading: isSelectedLoading,
+    isError: isSelectedError
+  } = useVolume24hBySymbol(selectedSymbol ?? '', Boolean(selectedSymbol))
 
   const {
     data: response,
@@ -149,6 +165,51 @@ export function Volume24hPanel() {
 
   return (
     <div className='flex h-full flex-col'>
+      <div className='border-b border-slate-800/50 bg-[#0f1116] px-4 py-3'>
+        <div className='flex items-center justify-between gap-4'>
+          <div>
+            <div className='text-xs uppercase tracking-wide text-slate-500'>24h volume</div>
+            <div className='text-sm text-slate-400'>Click a row to show details</div>
+          </div>
+          {selectedSymbol && (
+            <button
+              type='button'
+              onClick={() => setSelectedSymbol(null)}
+              className='rounded border border-slate-700 px-3 py-1 text-xs text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-200'
+            >
+              Hide details
+            </button>
+          )}
+        </div>
+
+        {selectedSymbol && (
+          <div className='mt-3 rounded-lg border border-slate-800/80 bg-[#131722] px-4'>
+            {isSelectedLoading ? (
+              <div className='py-4 text-sm text-slate-500'>Loading symbol details...</div>
+            ) : isSelectedError || !selectedVolume?.data ? (
+              <div className='py-4 text-sm text-slate-500'>No detail available for this symbol.</div>
+            ) : (
+              <div className='grid gap-2 py-2 md:grid-cols-2'>
+                <DetailRow label='Symbol' value={selectedVolume.data.symbol} />
+                <DetailRow label='Exchange' value={selectedVolume.data.exchange.toUpperCase()} />
+                <DetailRow label='Lookback' value={`${selectedVolume.data.lookback_hours}h`} />
+                <DetailRow label='Volume (USDT)' value={`$${formatVolume(selectedVolume.data.volume_quote_24h)}`} />
+                <DetailRow label='Base volume' value={formatVolume(selectedVolume.data.volume_base_24h)} />
+                <DetailRow label='Trade count' value={formatTradeCount(selectedVolume.data.trade_count_24h)} />
+                <DetailRow label='Updated' value={dayjs(selectedVolume.data.updated_at).fromNow()} />
+                <DetailRow label='Window start' value={dayjs(selectedVolume.data.window_start).format('YYYY-MM-DD HH:mm:ss')} />
+                <DetailRow label='Window end' value={dayjs(selectedVolume.data.window_end).format('YYYY-MM-DD HH:mm:ss')} />
+                <DetailRow label='Computed at' value={dayjs(selectedVolume.data.computed_at).format('YYYY-MM-DD HH:mm:ss')} />
+                <DetailRow
+                  label='Record ID'
+                  value={<span className='font-mono text-[11px] text-slate-400'>{selectedVolume.data.id}</span>}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className='flex-1 overflow-auto'>
         <Table>
           <TableHeader className='sticky top-0 z-10 bg-[#0f1116]'>
@@ -174,7 +235,10 @@ export function Volume24hPanel() {
               return (
                 <TableRow
                   key={row.id}
-                  onClick={() => setActiveSymbol(row.original.symbol)}
+                  onClick={() => {
+                    setActiveSymbol(row.original.symbol)
+                    setSelectedSymbol(row.original.symbol)
+                  }}
                   className={`cursor-pointer border-slate-800/30 ${
                     isActive ? 'bg-blue-500/5 text-slate-100' : 'text-slate-300'
                   }`}

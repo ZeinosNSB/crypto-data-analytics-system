@@ -14,6 +14,17 @@ export function WatchlistPanel() {
 
   const filteredSymbols = symbols.filter(s => s.symbol.toLowerCase().includes(search.toLowerCase()))
 
+  function formatChangePercent(value: number) {
+    const precision = Math.abs(value) < 0.01 ? 4 : 2
+    return value.toFixed(precision)
+  }
+
+  function formatPriceDelta(value: number) {
+    const precision = Math.abs(value) < 1 ? 4 : 2
+    const prefix = value >= 0 ? '+' : ''
+    return `${prefix}${value.toFixed(precision)} USDT`
+  }
+
   return (
     <div className='flex h-full flex-col bg-[#0f1116]'>
       <div className='border-b border-slate-800 p-3'>
@@ -69,7 +80,10 @@ export function WatchlistPanel() {
                   className={`ml-auto inline-block rounded px-1.5 py-0.5 text-xs font-medium ${isUp ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}
                 >
                   {isUp ? '+' : ''}
-                  {item.changePercent24h.toFixed(2)}%
+                  {formatChangePercent(item.changePercent24h)}%
+                </span>
+                <span className='mt-1 text-[10px] leading-none text-slate-500'>
+                  {formatPriceDelta(item.priceChange)}
                 </span>
               </div>
             </div>
