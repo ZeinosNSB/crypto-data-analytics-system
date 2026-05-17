@@ -1,0 +1,37 @@
+api:
+  enabled: true
+  image:
+    repository: crypto-api
+    tag: "dev-k8s"
+  env:
+    PRODUCTION: "true"
+    PORT: "4000"
+    PREFIX: "/api/v1"
+    CLIENT_URL: "http://crypto.local"
+    REDIS_URL: "redis://host.k3d.internal:6379"
+    MONGO_URI: "mongodb://admin:admin123@host.k3d.internal:27017/crypto_analytics?authSource=admin"
+
+web:
+  enabled: true
+  image:
+    repository: crypto-web
+    tag: "dev-k8s"
+  env:
+    NEXT_PUBLIC_URL: "http://crypto.local"
+    NEXT_PUBLIC_API_ENDPOINT: "http://crypto.local/api/v1"
+    NEXT_PUBLIC_WEBSOCKET_ENDPOINT: "ws://crypto.local/api/v1"
+
+ingress:
+  enabled: true
+  className: traefik
+  hosts:
+    - host: crypto.local
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: web
+          servicePort: 3000
+        - path: /api
+          pathType: Prefix
+          serviceName: api
+          servicePort: 4000

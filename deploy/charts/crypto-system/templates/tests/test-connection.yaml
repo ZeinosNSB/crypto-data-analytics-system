@@ -1,0 +1,17 @@
+{{- if .Values.api.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "crypto-system.componentFullname" (dict "root" . "component" "api") }}-test-connection"
+  labels:
+    {{- include "crypto-system.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "crypto-system.componentFullname" (dict "root" . "component" "api") }}:{{ .Values.api.service.port }}']
+  restartPolicy: Never
+{{- end }}
