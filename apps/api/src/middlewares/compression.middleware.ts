@@ -1,12 +1,10 @@
-import { brotliCompressSync } from 'node:zlib'
-import { deflateSync, gzipSync, zstdCompressSync } from 'bun'
+import { brotliCompressSync, deflateSync, gzipSync } from 'node:zlib'
 import { Elysia } from 'elysia'
 
 const compressors = {
   br: (buffer: Buffer) => brotliCompressSync(buffer),
   gzip: (buffer: Buffer) => gzipSync(new Uint8Array(buffer)),
-  deflate: (buffer: Buffer) => deflateSync(new Uint8Array(buffer)),
-  zstd: (buffer: Buffer) => zstdCompressSync(buffer)
+  deflate: (buffer: Buffer) => deflateSync(new Uint8Array(buffer))
 }
 
 function isValidEncoding(encoding: string): encoding is keyof typeof compressors {

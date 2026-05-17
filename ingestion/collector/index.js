@@ -7,7 +7,14 @@ require('dotenv').config()
 // ==========================================
 // 1. CẤU HÌNH BIẾN MÔI TRƯỜNG & KHAI BÁO
 // ==========================================
-const SYMBOL = process.env.SYMBOL || 'BTC/USDT'
+function parseSymbols(value) {
+  return String(value || '')
+    .split(',')
+    .map(symbol => symbol.trim())
+    .filter(Boolean)
+}
+
+const SYMBOLS = parseSymbols(process.env.SYMBOLS || process.env.SYMBOL || 'BTC/USDT,ETH/USDT')
 const KAFKA_BROKER = process.env.KAFKA_BROKER || 'localhost:9092'
 const TOPIC = process.env.KAFKA_TOPIC || 'market_events'
 const PORT = process.env.PORT || 3000
@@ -69,22 +76,16 @@ function formatToContractV1(trade) {
 // ==========================================
 // 5. LUỒNG CHÍNH: CHẠY WEBSOCKET (HOT PATH)
 // ==========================================
-async function runCollector() {
-  await producer.connect()
-  console.log('✅ Đã kết nối Kafka')
-
-  // Dùng ccxt.pro để lấy bản WebSocket hỗ trợ Realtime
-  const exchange = new ccxt.pro.binance({ enableRateLimit: true })
-  isHealthy = true // Đánh dấu app đã sẵn sàng
-
-  console.log(`🚀 Bắt đầu stream dữ liệu ${SYMBOL} từ Binance WebSocket...`)
-
-  while (true) {
+async function runSymbolWorker(exchange, symbol) {
+  while (isHealthy) {
     try {
-      // Lệnh watchTrades sẽ chờ liên tục, hễ có giao dịch là nó nhả data ra ngay
-      const trades = await exchange.watchTrades(SYMBOL)
+      const trades = await exchange.watchTrades(symbol)
 
       for (const trade of trades) {
+        if (!isHealthy) {
+          break
+        }
+
         const payload = formatToContractV1(trade)
 
         await producer.send({
@@ -92,18 +93,33 @@ async function runCollector() {
           messages: [{ value: JSON.stringify(payload) }]
         })
 
-        messagesSent.inc() // Tăng bộ đếm Prometheus lên 1
+        messagesSent.inc()
       }
     } catch (error) {
-      console.error('❌ Lỗi WebSocket:', error.message)
+      console.error(`❌ Lỗi WebSocket [${symbol}]:`, error.message)
       wsErrors.inc()
-      isHealthy = false // Báo cho K8s biết app đang ốm
-
-      // Đợi 5 giây rồi thử kết nối lại
+      isHealthy = false
       await new Promise((resolve) => setTimeout(resolve, 5000))
       isHealthy = true
     }
   }
+}
+
+async function runCollector() {
+  await producer.connect()
+  console.log('✅ Đã kết nối Kafka')
+
+  if (SYMBOLS.length === 0) {
+    throw new Error('Không có symbol hợp lệ để ingest')
+  }
+
+  // Dùng ccxt.pro để lấy bản WebSocket hỗ trợ Realtime
+  const exchange = new ccxt.pro.binance({ enableRateLimit: true })
+  isHealthy = true // Đánh dấu app đã sẵn sàng
+
+  console.log(`🚀 Bắt đầu stream dữ liệu ${SYMBOLS.join(', ')} từ Binance WebSocket...`)
+
+  await Promise.all(SYMBOLS.map(symbol => runSymbolWorker(exchange, symbol)))
 }
 
 // ==========================================
