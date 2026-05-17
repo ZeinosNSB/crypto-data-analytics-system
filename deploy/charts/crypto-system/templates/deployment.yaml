@@ -43,8 +43,36 @@ spec:
           {{- end }}
           env:
             {{- range $key, $value := .Values.api.env }}
+            {{- if ne (toString $value) "" }}
             - name: {{ $key }}
               value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.api.connectionSecret.enabled }}
+            {{- if .Values.infra.redis.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.infra.redis.auth.existingSecret }}
+                  key: {{ .Values.infra.redis.auth.secretKey }}
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@{{ .Values.infra.redis.host }}:{{ .Values.infra.redis.port }}"
+            {{- else }}
+            - name: REDIS_URL
+              value: "redis://{{ .Values.infra.redis.host }}:{{ .Values.infra.redis.port }}"
+            {{- end }}
+            {{- if .Values.infra.mongodb.auth.enabled }}
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.infra.mongodb.auth.existingSecret }}
+                  key: {{ .Values.infra.mongodb.auth.secretKey }}
+            - name: MONGO_URI
+              value: "mongodb://{{ .Values.infra.mongodb.auth.username }}:$(MONGO_PASSWORD)@{{ .Values.infra.mongodb.host }}:{{ .Values.infra.mongodb.port }}/{{ .Values.infra.mongodb.database }}?authSource={{ .Values.infra.mongodb.authSource }}"
+            {{- else }}
+            - name: MONGO_URI
+              value: "mongodb://{{ .Values.infra.mongodb.host }}:{{ .Values.infra.mongodb.port }}/{{ .Values.infra.mongodb.database }}"
+            {{- end }}
             {{- end }}
           {{- with .Values.api.livenessProbe }}
           livenessProbe:

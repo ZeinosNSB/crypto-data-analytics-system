@@ -1,0 +1,15 @@
+dependencies:
+- name: redis
+  repository: https://charts.bitnami.com/bitnami
+  version: 25.5.3
+- name: mongodb
+  repository: https://charts.bitnami.com/bitnami
+  version: 19.0.3
+- name: kafka
+  repository: https://charts.bitnami.com/bitnami
+  version: 32.4.3
+- name: minio
+  repository: https://charts.bitnami.com/bitnami
+  version: 17.0.21
+digest: sha256:a653e31b2f266db931d85e49f6c11f2a417429eb586e63f814732d2b85976fac
+generated: "2026-05-17T16:40:19.496690054+07:00"

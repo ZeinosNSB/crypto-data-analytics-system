@@ -76,24 +76,111 @@ export interface ServerWebSocket {
 
 const symbolSubscribers = new Map<string, Set<string>>()
 const connectedClients = new Map<string, ServerWebSocket>()
+const REDIS_OHLC_CHANNEL = 'hotpath:ohlc:1m:channel'
+const SUBSCRIBE_RETRY_MAX_DELAY_MS = 30_000
+const STATUS_LOG_INTERVAL_MS = 30_000
+
+let isPubSubInitialized = false
+let isRedisChannelSubscribed = false
+let subscribeRetryAttempt = 0
+let subscribeRetryTimer: ReturnType<typeof setTimeout> | null = null
+let statusLogTimer: ReturnType<typeof setInterval> | null = null
+let isSubscribing = false
 
 function sendTypedMessage(ws: ServerWebSocket, msg: WsServerMessage) {
   ws.send(JSON.stringify(msg))
 }
 
+function scheduleSubscribeRetry(error: unknown, reason: string) {
+  if (subscribeRetryTimer) {
+    return
+  }
+
+  subscribeRetryAttempt += 1
+  const delayMs = Math.min(1000 * 2 ** (subscribeRetryAttempt - 1), SUBSCRIBE_RETRY_MAX_DELAY_MS)
+  const errMessage = error instanceof Error ? error.message : String(error)
+
+  log.warn({
+    msg: `[ws] Subscribe retry #${subscribeRetryAttempt} for ${REDIS_OHLC_CHANNEL} in ${delayMs}ms (${reason})`,
+    error: errMessage
+  })
+
+  subscribeRetryTimer = setTimeout(() => {
+    subscribeRetryTimer = null
+    void attemptChannelSubscribe('retry')
+  }, delayMs)
+}
+
+async function attemptChannelSubscribe(trigger: string) {
+  if (isRedisChannelSubscribed || isSubscribing) {
+    return
+  }
+
+  if (redisPubSub.status !== 'ready') {
+    scheduleSubscribeRetry(new Error(`redisPubSub status is ${redisPubSub.status}`), `trigger=${trigger}`)
+    return
+  }
+
+  isSubscribing = true
+  try {
+    await redisPubSub.subscribe(REDIS_OHLC_CHANNEL)
+    isRedisChannelSubscribed = true
+    subscribeRetryAttempt = 0
+
+    if (subscribeRetryTimer) {
+      clearTimeout(subscribeRetryTimer)
+      subscribeRetryTimer = null
+    }
+
+    log.info({ msg: `[ws] Subscribed to ${REDIS_OHLC_CHANNEL}` })
+  } catch (err) {
+    isRedisChannelSubscribed = false
+    scheduleSubscribeRetry(err, `trigger=${trigger}`)
+  } finally {
+    isSubscribing = false
+  }
+}
+
+function markPubSubNotSubscribed(reason: string) {
+  if (isRedisChannelSubscribed || isSubscribing) {
+    log.warn({ msg: `[ws] Marking Redis Pub/Sub as unsubscribed (${reason})` })
+  }
+  isRedisChannelSubscribed = false
+  isSubscribing = false
+}
+
 export function initWebSocketPubSub() {
+  if (isPubSubInitialized) {
+    return
+  }
+  isPubSubInitialized = true
+
   log.info({ msg: 'Initializing Redis Pub/Sub for WebSockets...' })
 
-  redisPubSub.subscribe('hotpath:ohlc:1m:channel', (err, count) => {
-    if (err) {
-      log.error({ err, msg: 'Failed to subscribe to hotpath:ohlc:1m:channel' })
-      return
-    }
-    log.info({ msg: `Subscribed to ${count} channels including hotpath:ohlc:1m:channel` })
+  redisPubSub.on('ready', () => {
+    log.info({ msg: '[ws] Redis Pub/Sub ready, ensuring subscription...' })
+    void attemptChannelSubscribe('ready')
+  })
+
+  redisPubSub.on('connect', () => {
+    log.info({ msg: '[ws] Redis Pub/Sub connected, ensuring subscription...' })
+    void attemptChannelSubscribe('connect')
+  })
+
+  redisPubSub.on('reconnecting', () => {
+    markPubSubNotSubscribed('reconnecting')
+  })
+
+  redisPubSub.on('close', () => {
+    markPubSubNotSubscribed('close')
+  })
+
+  redisPubSub.on('end', () => {
+    markPubSubNotSubscribed('end')
   })
 
   redisPubSub.on('message', (channel, message) => {
-    if (channel !== 'hotpath:ohlc:1m:channel') {
+    if (channel !== REDIS_OHLC_CHANNEL) {
       return
     }
 
@@ -129,6 +216,17 @@ export function initWebSocketPubSub() {
       log.error({ err, msg: 'Failed to parse message from Redis' })
     }
   })
+
+  if (!statusLogTimer) {
+    statusLogTimer = setInterval(() => {
+      log.info({
+        msg: `[ws] ws_pubsub_subscribed=${isRedisChannelSubscribed}`,
+        redis_pubsub_status: redisPubSub.status
+      })
+    }, STATUS_LOG_INTERVAL_MS)
+  }
+
+  void attemptChannelSubscribe('init')
 }
 
 export function handleConnection(ws: ServerWebSocket) {

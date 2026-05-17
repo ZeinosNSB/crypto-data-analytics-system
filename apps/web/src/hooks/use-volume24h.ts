@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { envConfig } from '@workspace/web/config/env'
 import type { Volume24hDetailResponse, Volume24hListResponse } from '@workspace/web/types/volume.types'
 
-const API_BASE = envConfig.NEXT_PUBLIC_API_ENDPOINT
+const API_BASE = '/api/v1'
 
 interface UseVolume24hListOptions {
   sort_by?: 'symbol' | 'volume_quote_24h' | 'trade_count_24h' | 'updated_at'

@@ -1,4 +1,3 @@
-import { envConfig } from '@workspace/web/config/env'
 import { useChartStore } from '@workspace/web/stores/chart.store'
 import { useMarketStore } from '@workspace/web/stores/market.store'
 import { useWatchlistStore } from '@workspace/web/stores/watchlist.store'
@@ -10,7 +9,11 @@ import type { OhlcCandlePayload } from '@workspace/web/types/market.types'
 import type { WatchlistSymbol } from '@workspace/web/types/market.types'
 import type { ConnectionState, WsClientMessage, WsServerMessage } from '@workspace/web/types/websocket.types'
 
-const WS_URL = envConfig.NEXT_PUBLIC_WEBSOCKET_ENDPOINT + '/ws'
+function getWebSocketUrl() {
+  if (typeof window === 'undefined') return 'ws://localhost:4000/api/v1/ws'
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  return `${protocol}://${window.location.host}/api/v1/ws`
+}
 
 const READY_STATE_MAP: Record<number, ConnectionState> = {
   [ReadyState.CONNECTING]: 'CONNECTING',
@@ -105,7 +108,7 @@ export function useMarketWebsocket(activeSymbol: string) {
     }
   }, [])
 
-  const { sendJsonMessage, readyState } = useWebSocket(WS_URL, {
+  const { sendJsonMessage, readyState } = useWebSocket(getWebSocketUrl(), {
     onMessage: handleMessage,
     shouldReconnect: () => true,
     reconnectAttempts: 20,

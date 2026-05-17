@@ -22,3 +22,21 @@ version: 0.1.0
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: "1.16.0"
+
+dependencies:
+  - name: redis
+    version: ">=0.0.0-0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: infra.redis.enabled
+  - name: mongodb
+    version: ">=0.0.0-0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: infra.mongodb.enabled
+  - name: kafka
+    version: ">=0.0.0-0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: infra.kafka.enabled
+  - name: minio
+    version: ">=0.0.0-0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: infra.minio.enabled

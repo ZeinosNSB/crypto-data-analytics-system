@@ -8,3 +8,4 @@ COPY processing/batch/pyspark_project/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 WORKDIR /workspace
+COPY processing /workspace/processing

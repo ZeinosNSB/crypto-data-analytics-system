@@ -1,0 +1,115 @@
+{{- if and .Values.batch.enabled .Values.batch.kafkaToMinio.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "crypto-system.componentFullname" (dict "root" . "component" "batch-kafka-to-minio") }}
+  labels:
+    {{- include "crypto-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: batch-kafka-to-minio
+spec:
+  schedule: {{ .Values.batch.kafkaToMinio.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "crypto-system.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: batch-kafka-to-minio
+        spec:
+          restartPolicy: OnFailure
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "crypto-system.serviceAccountName" . }}
+          containers:
+            - name: batch-kafka-to-minio
+              image: "{{ .Values.batch.image.repository }}:{{ .Values.batch.image.tag }}"
+              imagePullPolicy: {{ .Values.batch.image.pullPolicy }}
+              command:
+                {{- toYaml .Values.batch.kafkaToMinio.command | nindent 16 }}
+              env:
+                {{- range $key, $value := .Values.batch.kafkaToMinio.env }}
+                - name: {{ $key }}
+                  value: {{ $value | quote }}
+                {{- end }}
+                - name: MINIO_ROOT_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.infra.minio.auth.existingSecret }}
+                      key: {{ .Values.infra.minio.auth.userSecretKey }}
+                - name: MINIO_ROOT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.infra.minio.auth.existingSecret }}
+                      key: {{ .Values.infra.minio.auth.passwordSecretKey }}
+              {{- with .Values.batch.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+---
+{{- end }}
+
+{{- if and .Values.batch.enabled .Values.batch.volume24hToMongo.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "crypto-system.componentFullname" (dict "root" . "component" "batch-volume24h-mongo") }}
+  labels:
+    {{- include "crypto-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: batch-volume24h-mongo
+spec:
+  schedule: {{ .Values.batch.volume24hToMongo.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "crypto-system.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: batch-volume24h-mongo
+        spec:
+          restartPolicy: OnFailure
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "crypto-system.serviceAccountName" . }}
+          containers:
+            - name: batch-volume24h-mongo
+              image: "{{ .Values.batch.image.repository }}:{{ .Values.batch.image.tag }}"
+              imagePullPolicy: {{ .Values.batch.image.pullPolicy }}
+              command:
+                {{- toYaml .Values.batch.volume24hToMongo.command | nindent 16 }}
+              env:
+                {{- range $key, $value := .Values.batch.volume24hToMongo.env }}
+                - name: {{ $key }}
+                  value: {{ $value | quote }}
+                {{- end }}
+                - name: MINIO_ROOT_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.infra.minio.auth.existingSecret }}
+                      key: {{ .Values.infra.minio.auth.userSecretKey }}
+                - name: MINIO_ROOT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.infra.minio.auth.existingSecret }}
+                      key: {{ .Values.infra.minio.auth.passwordSecretKey }}
+                - name: MONGO_ROOT_USERNAME
+                  value: {{ .Values.infra.mongodb.auth.username | quote }}
+                - name: MONGO_ROOT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.infra.mongodb.auth.existingSecret }}
+                      key: {{ .Values.infra.mongodb.auth.secretKey }}
+              {{- with .Values.batch.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+{{- end }}

@@ -1,0 +1,24 @@
+{{- if and .Values.infra.kafkaUi.enabled .Values.infra.kafkaUi.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "crypto-system.componentFullname" (dict "root" . "component" "kafka-ui") }}
+  labels:
+    {{- include "crypto-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka-ui
+spec:
+  {{- with .Values.infra.kafkaUi.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.infra.kafkaUi.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "crypto-system.componentFullname" (dict "root" . "component" "kafka-ui") }}
+                port:
+                  number: {{ .Values.infra.kafkaUi.service.port }}
+{{- end }}

@@ -8,3 +8,5 @@ COPY processing/streaming/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 WORKDIR /workspace
+COPY processing /workspace/processing
+COPY docs /workspace/docs

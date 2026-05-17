@@ -1,0 +1,32 @@
+{{- if .Values.infra.kafkaUi.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "crypto-system.componentFullname" (dict "root" . "component" "kafka-ui") }}
+  labels:
+    {{- include "crypto-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "crypto-system.componentSelectorLabels" (dict "root" . "component" "kafka-ui") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "crypto-system.componentSelectorLabels" (dict "root" . "component" "kafka-ui") | nindent 8 }}
+    spec:
+      containers:
+        - name: kafka-ui
+          image: {{ .Values.infra.kafkaUi.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: KAFKA_CLUSTERS_0_NAME
+              value: local-kraft
+            - name: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS
+              value: {{ printf "%s:%v" .Values.infra.kafka.host .Values.infra.kafka.port | quote }}
+{{- end }}

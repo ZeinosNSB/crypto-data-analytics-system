@@ -1,0 +1,132 @@
+HUONG DAN VAN HANH K3D/K8S CHO NGUOI MOI (BRANCH feat/k8s-helm-deploy)
+
+Muc tieu:
+- Khoi dong lan dau sau khi clone.
+- Tat he thong an toan.
+- Bat lai he thong an toan.
+- chu y branch nay duoc thiet ke de chay tren wsl2 hoac moi truong linux. dam bao mo project tren moi truong linux truoc khi chay
+
+Yeu cau cai dat truoc:
+- docker
+- k3d
+- kubectl
+- helm
+- node + corepack (de dung pnpm)
+
+====================================================================
+1) KHOI DONG LAN DAU (SAU KHI CLONE BRANCH)
+====================================================================
+
+Buoc 0 - Clone va checkout dung branch
+git clone <repo-url>
+cd crypto-data-analytics-system
+git checkout feat/k8s-helm-deploy
+
+Buoc 1 - Cau hinh hosts (chi can lam 1 lan tren moi may)
+# them vao /etc/hosts:
+127.0.0.1 crypto.local
+127.0.0.1 kafka-ui.crypto.local
+
+Buoc 2 - Tao cluster k3d (chi can lam 1 lan tren moi may)
+k3d cluster create crypto-dev --agents 2 -p "8081:80@loadbalancer"
+
+Neu cluster da ton tai thi:
+k3d cluster start crypto-dev
+
+Buoc 3 - Tao namespace
+kubectl create namespace crypto-dev --dry-run=client -o yaml | kubectl apply -f -
+
+Buoc 4 - Cai dependencies monorepo
+corepack enable
+corepack pnpm install
+
+Buoc 5 - Build artifact truoc khi docker build
+# API can dist/apps/api/*
+corepack pnpm build:api
+
+# WEB can apps/web/.next/*
+# NOTE: web build can 3 bien NEXT_PUBLIC_*
+NEXT_PUBLIC_URL=http://crypto.local:8081 \
+NEXT_PUBLIC_API_ENDPOINT=http://crypto.local:8081/api/v1 \
+NEXT_PUBLIC_WEBSOCKET_ENDPOINT=ws://crypto.local:8081/api/v1 \
+corepack pnpm build:web
+
+Buoc 6 - Build image app local
+docker build -f apps/api/Dockerfile -t crypto-api:dev-k8s .
+docker build -f apps/web/Dockerfile -t crypto-web:dev-k8s .
+
+Buoc 7 - Import image vao k3d
+k3d image import -c crypto-dev crypto-api:dev-k8s crypto-web:dev-k8s
+
+Buoc 8 - Cap nhat chart dependencies
+helm dependency update deploy/charts/crypto-system
+
+Buoc 9 - Deploy he thong
+helm upgrade --install crypto-system deploy/charts/crypto-system \
+  -n crypto-dev \
+  -f deploy/charts/crypto-system/values-dev.yaml
+
+Buoc 10 - Kiem tra sau deploy
+kubectl get pods,svc,ing,cronjobs -n crypto-dev
+helm list -n crypto-dev
+helm test crypto-system -n crypto-dev
+
+Buoc 11 - Kiem tra nhanh endpoint
+curl -H 'Host: crypto.local' http://localhost:8081/
+curl -H 'Host: crypto.local' http://localhost:8081/api/v1/
+curl -H 'Host: crypto.local' "http://localhost:8081/api/v1/volume24h?exchange=binance&sort_by=updated_at"
+curl -H 'Host: kafka-ui.crypto.local' http://localhost:8081/
+
+====================================================================
+2) TAT HE THONG AN TOAN
+====================================================================
+
+Khuyen dung (giu nguyen release de lan sau bat lai nhanh):
+
+Buoc 1 - Suspend CronJob tranh tao Job moi luc dang tat
+kubectl patch cronjob crypto-system-batch-kafka-to-minio -n crypto-dev -p '{"spec":{"suspend":true}}'
+kubectl patch cronjob crypto-system-batch-volume24h-mongo -n crypto-dev -p '{"spec":{"suspend":true}}'
+
+Buoc 2 - Xac nhan khong co Job moi dang tao
+kubectl get jobs -n crypto-dev
+
+Buoc 3 - Stop cluster
+k3d cluster stop crypto-dev
+
+====================================================================
+3) BAT LAI HE THONG AN TOAN
+====================================================================
+
+Buoc 1 - Start cluster
+k3d cluster start crypto-dev
+
+Buoc 2 - Kiem tra namespace va release
+kubectl get ns crypto-dev
+helm list -n crypto-dev
+
+Buoc 3 - Unsuspend CronJob de batch chay lai
+kubectl patch cronjob crypto-system-batch-kafka-to-minio -n crypto-dev -p '{"spec":{"suspend":false}}'
+kubectl patch cronjob crypto-system-batch-volume24h-mongo -n crypto-dev -p '{"spec":{"suspend":false}}'
+
+Buoc 4 - Kiem tra trang thai he thong
+kubectl get pods,svc,ing,cronjobs -n crypto-dev
+helm test crypto-system -n crypto-dev
+
+Buoc 5 - Neu release khong con (vd da uninstall truoc do), deploy lai:
+helm upgrade --install crypto-system deploy/charts/crypto-system \
+  -n crypto-dev \
+  -f deploy/charts/crypto-system/values-dev.yaml
+
+====================================================================
+GHI CHU
+====================================================================
+
+- Khi sua code API hoac Web:
+  1) build artifact (pnpm build:api / pnpm build:web)
+  2) docker build image
+  3) k3d image import
+  4) kubectl rollout restart deploy/<service> -n crypto-dev
+  5) kubectl rollout status deploy/<service> -n crypto-dev
+
+- Neu web van hien hanh vi cu sau khi deploy:
+  hard refresh browser (Ctrl+F5) hoac mo tab incognito.

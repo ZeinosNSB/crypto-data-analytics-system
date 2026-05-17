@@ -137,8 +137,6 @@ async function runCollector() {
         }
     }
   }
-}
-
 // ==========================================
 // 6. DỰNG EXPRESS SERVER (CHO K8S & MONITORING)
 // ==========================================

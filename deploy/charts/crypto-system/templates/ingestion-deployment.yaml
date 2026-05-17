@@ -1,0 +1,53 @@
+{{- if .Values.ingestion.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "crypto-system.componentFullname" (dict "root" . "component" "ingestion") }}
+  labels:
+    {{- include "crypto-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingestion
+spec:
+  replicas: {{ .Values.ingestion.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "crypto-system.componentSelectorLabels" (dict "root" . "component" "ingestion") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "crypto-system.componentSelectorLabels" (dict "root" . "component" "ingestion") | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "crypto-system.serviceAccountName" . }}
+      containers:
+        - name: ingestion
+          image: "{{ .Values.ingestion.image.repository }}:{{ .Values.ingestion.image.tag }}"
+          imagePullPolicy: {{ .Values.ingestion.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.ingestion.service.targetPort }}
+              protocol: TCP
+          env:
+            {{- range $key, $value := .Values.ingestion.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          {{- with .Values.ingestion.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

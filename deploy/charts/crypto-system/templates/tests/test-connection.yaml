@@ -9,9 +9,23 @@ metadata:
     "helm.sh/hook": test
 spec:
   containers:
-    - name: wget
-      image: busybox
-      command: ['wget']
-      args: ['{{ include "crypto-system.componentFullname" (dict "root" . "component" "api") }}:{{ .Values.api.service.port }}']
+    - name: smoke-test
+      image: busybox:1.36
+      command: ["/bin/sh", "-ec"]
+      args:
+        - |
+          wget -qO- http://{{ include "crypto-system.componentFullname" (dict "root" . "component" "api") }}:{{ .Values.api.service.port }}/api/v1/ >/dev/null
+          {{- if .Values.infra.redis.enabled }}
+          nc -z -w5 {{ .Values.infra.redis.host }} {{ .Values.infra.redis.port }}
+          {{- end }}
+          {{- if .Values.infra.mongodb.enabled }}
+          nc -z -w5 {{ .Values.infra.mongodb.host }} {{ .Values.infra.mongodb.port }}
+          {{- end }}
+          {{- if .Values.infra.kafka.enabled }}
+          nc -z -w5 {{ .Values.infra.kafka.host }} {{ .Values.infra.kafka.port }}
+          {{- end }}
+          {{- if .Values.infra.minio.enabled }}
+          wget -qO- http://{{ .Values.infra.minio.host }}:{{ .Values.infra.minio.port }}/minio/health/live >/dev/null
+          {{- end }}
   restartPolicy: Never
 {{- end }}

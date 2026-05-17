@@ -1,0 +1,47 @@
+{{- if .Values.streaming.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "crypto-system.componentFullname" (dict "root" . "component" "streaming") }}
+  labels:
+    {{- include "crypto-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: streaming
+spec:
+  replicas: {{ .Values.streaming.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "crypto-system.componentSelectorLabels" (dict "root" . "component" "streaming") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "crypto-system.componentSelectorLabels" (dict "root" . "component" "streaming") | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "crypto-system.serviceAccountName" . }}
+      containers:
+        - name: streaming
+          image: "{{ .Values.streaming.image.repository }}:{{ .Values.streaming.image.tag }}"
+          imagePullPolicy: {{ .Values.streaming.image.pullPolicy }}
+          command:
+            - python
+            - processing/streaming/src/streaming_app.py
+          env:
+            {{- range $key, $value := .Values.streaming.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if and .Values.streaming.redisPasswordFromSecret .Values.infra.redis.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.infra.redis.auth.existingSecret }}
+                  key: {{ .Values.infra.redis.auth.secretKey }}
+            {{- end }}
+          {{- with .Values.streaming.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
