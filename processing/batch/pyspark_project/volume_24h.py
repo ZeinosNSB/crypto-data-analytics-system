@@ -15,7 +15,12 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.types import DecimalType
 
-from common import create_spark_session, ensure_bucket_for_path, raw_events_path, volume_24h_output_path
+from common import (
+    create_spark_session,
+    ensure_bucket_for_path,
+    raw_events_path,
+    volume_24h_output_path,
+)
 
 
 VOLUME_INPUT_COLUMNS = [
@@ -56,7 +61,8 @@ def parse_args():
     parser.add_argument(
         "--use-max-event-time",
         action="store_true",
-        default=os.getenv("VOLUME_24H_USE_MAX_EVENT_TIME", "").lower() in {"1", "true", "yes"},
+        default=os.getenv("VOLUME_24H_USE_MAX_EVENT_TIME", "").lower()
+        in {"1", "true", "yes"},
         help="Use the latest event_timestamp in the input as the window end.",
     )
     parser.add_argument(
@@ -99,7 +105,10 @@ def parse_utc_datetime(value):
 
 
 def spark_timestamp_literal(value):
-    return to_timestamp(lit(value.strftime("%Y-%m-%d %H:%M:%S")), "yyyy-MM-dd HH:mm:ss")
+    return to_timestamp(
+        lit(value.strftime("%Y-%m-%d %H:%M:%S")),
+        "yyyy-MM-dd HH:mm:ss",
+    )
 
 
 def resolve_window_end(raw_df, args):
@@ -107,15 +116,69 @@ def resolve_window_end(raw_df, args):
         return parse_utc_datetime(args.window_end)
 
     if args.use_max_event_time:
-        latest_row = raw_df.select(spark_max("event_timestamp").alias("window_end")).first()
+        latest_row = raw_df.select(
+            spark_max("event_timestamp").alias("window_end")
+        ).first()
         if latest_row is None or latest_row["window_end"] is None:
             return None
         latest_event_time = latest_row["window_end"]
         if latest_event_time.tzinfo is not None:
-            latest_event_time = latest_event_time.astimezone(timezone.utc).replace(tzinfo=None)
+            latest_event_time = latest_event_time.astimezone(timezone.utc).replace(
+                tzinfo=None
+            )
         return latest_event_time
 
     return None
+
+
+def build_volume_24h_dataframe(spark, args):
+    trade_df = spark.read.parquet(args.input).select(*VOLUME_INPUT_COLUMNS).filter(
+        (col("event_type") == "trade")
+        & col("event_timestamp").isNotNull()
+        & col("quantity_decimal").isNotNull()
+        & col("volume_quote").isNotNull()
+    )
+
+    symbols = parse_symbols(args.symbols)
+    if symbols:
+        trade_df = trade_df.filter(col("symbol").isin(symbols))
+
+    resolved_window_end = resolve_window_end(trade_df, args)
+    if resolved_window_end is None:
+        window_end_column = current_timestamp()
+        window_end_text = "current_timestamp()"
+    else:
+        window_end_column = spark_timestamp_literal(resolved_window_end)
+        window_end_text = resolved_window_end.isoformat(timespec="seconds") + "Z"
+
+    windowed_df = (
+        trade_df.withColumn("window_end", window_end_column)
+        .withColumn(
+            "window_start",
+            expr(f"window_end - INTERVAL {args.lookback_hours} HOURS"),
+        )
+        .filter(col("event_timestamp") >= col("window_start"))
+        .filter(col("event_timestamp") <= col("window_end"))
+    )
+
+    result_df = (
+        windowed_df.groupBy("exchange", "symbol", "window_start", "window_end")
+        .agg(
+            spark_sum("quantity_decimal")
+            .cast(DecimalType(38, 18))
+            .alias("volume_base_24h"),
+            spark_sum("volume_quote")
+            .cast(DecimalType(38, 18))
+            .alias("volume_quote_24h"),
+            count("*").alias("trade_count_24h"),
+            spark_min("event_timestamp").alias("first_event_timestamp"),
+            spark_max("event_timestamp").alias("last_event_timestamp"),
+        )
+        .withColumn("lookback_hours", lit(args.lookback_hours))
+        .withColumn("computed_at", current_timestamp())
+    )
+
+    return result_df, window_end_text
 
 
 def main():
@@ -128,45 +191,8 @@ def main():
     try:
         ensure_bucket_for_path(args.output)
 
-        trade_df = spark.read.parquet(args.input).select(*VOLUME_INPUT_COLUMNS).filter(
-            (col("event_type") == "trade")
-            & col("event_timestamp").isNotNull()
-            & col("quantity_decimal").isNotNull()
-            & col("volume_quote").isNotNull()
-        )
-
-        symbols = parse_symbols(args.symbols)
-        if symbols:
-            trade_df = trade_df.filter(col("symbol").isin(symbols))
-
-        resolved_window_end = resolve_window_end(trade_df, args)
-        if resolved_window_end is None:
-            window_end_column = current_timestamp()
-            window_end_text = "current_timestamp()"
-        else:
-            window_end_column = spark_timestamp_literal(resolved_window_end)
-            window_end_text = resolved_window_end.isoformat(timespec="seconds") + "Z"
-
-        windowed_df = (
-            trade_df.withColumn("window_end", window_end_column)
-            .withColumn("window_start", expr(f"window_end - INTERVAL {args.lookback_hours} HOURS"))
-            .filter(col("event_timestamp") >= col("window_start"))
-            .filter(col("event_timestamp") <= col("window_end"))
-        )
-
-        result_df = (
-            windowed_df.groupBy("exchange", "symbol", "window_start", "window_end")
-            .agg(
-                spark_sum("quantity_decimal").cast(DecimalType(38, 18)).alias("volume_base_24h"),
-                spark_sum("volume_quote").cast(DecimalType(38, 18)).alias("volume_quote_24h"),
-                count("*").alias("trade_count_24h"),
-                spark_min("event_timestamp").alias("first_event_timestamp"),
-                spark_max("event_timestamp").alias("last_event_timestamp"),
-            )
-            .withColumn("lookback_hours", lit(args.lookback_hours))
-            .withColumn("computed_at", current_timestamp())
-            .cache()
-        )
+        result_df, window_end_text = build_volume_24h_dataframe(spark, args)
+        result_df = result_df.cache()
 
         try:
             result_count = result_df.count()

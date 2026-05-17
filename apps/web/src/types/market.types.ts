@@ -73,6 +73,7 @@ export interface CandleData {
 export interface WatchlistSymbol {
   symbol: string
   lastPrice: number
+  priceChange: number
   changePercent24h: number
   volume24h: number
   high24h: number

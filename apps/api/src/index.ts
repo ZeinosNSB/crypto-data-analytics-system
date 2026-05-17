@@ -1,7 +1,9 @@
 import cors from '@elysiajs/cors'
 import { envConfig, isProd } from '@workspace/api/config/env'
+import { initMongo } from '@workspace/api/libs/mongo'
 import { compression } from '@workspace/api/middlewares/compression.middleware'
 import { logger } from '@workspace/api/middlewares/logger.middleware'
+import { mongoHealthRoute, volume24hRoutes } from '@workspace/api/modules/volume24h/volume24h.handler'
 import {
   handleClientMessage,
   handleConnection,
@@ -12,6 +14,7 @@ import { log } from '@workspace/api/utils/log'
 import { Elysia } from 'elysia'
 import { helmet } from 'elysia-helmet'
 
+await initMongo()
 initWebSocketPubSub()
 
 const app = new Elysia({
@@ -30,6 +33,8 @@ const app = new Elysia({
     })
   )
   .get('/', () => 'Hello World!')
+  .use(volume24hRoutes())
+  .use(mongoHealthRoute())
   .ws('/ws', {
     open(ws) {
       handleConnection(ws)

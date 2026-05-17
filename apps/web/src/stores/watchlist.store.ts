@@ -9,11 +9,11 @@ interface WatchlistState {
 
 export const useWatchlistStore = create<WatchlistState>(set => ({
   symbols: [
-    { symbol: 'BTCUSDT', lastPrice: 0, changePercent24h: 0, volume24h: 0, high24h: 0, low24h: 0, sparkline: [] },
-    { symbol: 'ETHUSDT', lastPrice: 0, changePercent24h: 0, volume24h: 0, high24h: 0, low24h: 0, sparkline: [] },
-    { symbol: 'SOLUSDT', lastPrice: 0, changePercent24h: 0, volume24h: 0, high24h: 0, low24h: 0, sparkline: [] },
-    { symbol: 'BNBUSDT', lastPrice: 0, changePercent24h: 0, volume24h: 0, high24h: 0, low24h: 0, sparkline: [] },
-    { symbol: 'XRPUSDT', lastPrice: 0, changePercent24h: 0, volume24h: 0, high24h: 0, low24h: 0, sparkline: [] }
+    { symbol: 'BTCUSDT', lastPrice: 0, priceChange: 0, changePercent24h: 0, volume24h: 0, high24h: 0, low24h: 0, sparkline: [] },
+    { symbol: 'ETHUSDT', lastPrice: 0, priceChange: 0, changePercent24h: 0, volume24h: 0, high24h: 0, low24h: 0, sparkline: [] },
+    { symbol: 'SOLUSDT', lastPrice: 0, priceChange: 0, changePercent24h: 0, volume24h: 0, high24h: 0, low24h: 0, sparkline: [] },
+    { symbol: 'BNBUSDT', lastPrice: 0, priceChange: 0, changePercent24h: 0, volume24h: 0, high24h: 0, low24h: 0, sparkline: [] },
+    { symbol: 'XRPUSDT', lastPrice: 0, priceChange: 0, changePercent24h: 0, volume24h: 0, high24h: 0, low24h: 0, sparkline: [] }
   ],
   updateSymbol: (symbolId, updates) =>
     set(state => ({

@@ -3,10 +3,11 @@ import { useChartStore } from '@workspace/web/stores/chart.store'
 import { useMarketStore } from '@workspace/web/stores/market.store'
 import { useWatchlistStore } from '@workspace/web/stores/watchlist.store'
 import { useWebsocketStore } from '@workspace/web/stores/websocket.store'
-import { toChartTime } from '@workspace/web/utils/chart.utils'
+import { toChartTime } from '@workspace/web/utils/chart'
 import { useCallback, useEffect, useRef } from 'react'
 import useWebSocket, { ReadyState } from 'react-use-websocket'
 import type { OhlcCandlePayload } from '@workspace/web/types/market.types'
+import type { WatchlistSymbol } from '@workspace/web/types/market.types'
 import type { ConnectionState, WsClientMessage, WsServerMessage } from '@workspace/web/types/websocket.types'
 
 const WS_URL = envConfig.NEXT_PUBLIC_WEBSOCKET_ENDPOINT + '/ws'
@@ -31,103 +32,146 @@ function candlePayloadToChartCandle(payload: OhlcCandlePayload) {
 }
 
 function updateStoresFromCandle(symbol: string, payload: OhlcCandlePayload) {
-  const price = parseFloat(payload.close)
+  const open = parseFloat(payload.open)
+  const close = parseFloat(payload.close)
+  const high = parseFloat(payload.high)
+  const low = parseFloat(payload.low)
+  const volume = parseFloat(payload.volume)
+  const priceChange = close - open
+  const previousWatchlistPrice =
+    useWatchlistStore.getState().symbols.find((item: WatchlistSymbol) => item.symbol === symbol)?.lastPrice ?? 0
+  const changeBasePrice = previousWatchlistPrice > 0 ? previousWatchlistPrice : open
+  const changePercent = changeBasePrice !== 0 ? ((close - changeBasePrice) / changeBasePrice) * 100 : 0
+  const priceDelta = close - changeBasePrice
 
   useWatchlistStore.getState().updateSymbol(symbol, {
-    lastPrice: price,
-    volume24h: parseFloat(payload.volume)
+    lastPrice: close,
+    priceChange: priceDelta,
+    changePercent24h: changePercent,
+    volume24h: volume,
+    high24h: high,
+    low24h: low
   })
 
   useMarketStore.getState().setStats(symbol, {
     symbol,
-    lastPrice: price,
-    priceChange: parseFloat(payload.close) - parseFloat(payload.open),
-    priceChangePercent:
-      parseFloat(payload.open) !== 0
-        ? ((parseFloat(payload.close) - parseFloat(payload.open)) / parseFloat(payload.open)) * 100
-        : 0,
-    high: parseFloat(payload.high),
-    low: parseFloat(payload.low),
-    volume: parseFloat(payload.volume),
+    lastPrice: close,
+    priceChange,
+    priceChangePercent: changePercent,
+    high,
+    low,
+    volume,
     quoteVolume: 0
   })
 }
 
-export function useMarketWebsocket(symbol: string) {
-  const prevSymbolRef = useRef<string | null>(null)
+export function useMarketWebsocket(activeSymbol: string) {
+  const prevActiveRef = useRef<string | null>(null)
+  const subscribedRef = useRef<Set<string>>(new Set())
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const handleMessage = useCallback(
-    (event: MessageEvent<string>) => {
-      let msg: WsServerMessage
-      try {
-        msg = JSON.parse(event.data) as WsServerMessage
-      } catch {
-        return
+  const handleMessage = useCallback((event: MessageEvent<string>) => {
+    let msg: WsServerMessage
+    try {
+      msg = JSON.parse(event.data) as WsServerMessage
+    } catch {
+      return
+    }
+
+    switch (msg.type) {
+      case 'OHLC_HISTORY': {
+        if (msg.symbol === useChartStore.getState().activeSymbol) {
+          useChartStore.getState().setHistoryFromBackend(msg.data)
+        }
+        break
       }
 
-      switch (msg.type) {
-        case 'OHLC_HISTORY': {
-          if (msg.symbol === symbol) {
-            useChartStore.getState().setHistoryFromBackend(msg.data)
-          }
-          break
-        }
-
-        case 'DATA': {
-          if (msg.channel === 'ohlc_candle') {
+      case 'DATA': {
+        if (msg.channel === 'ohlc_candle') {
+          if (msg.symbol === useChartStore.getState().activeSymbol) {
             const candle = candlePayloadToChartCandle(msg.data)
-
-            if (msg.symbol === useChartStore.getState().activeSymbol) {
-              useChartStore.getState().updateCurrentCandle(candle)
-            }
-
-            updateStoresFromCandle(msg.symbol, msg.data)
+            useChartStore.getState().updateCurrentCandle(candle)
           }
-          break
-        }
 
-        case 'CONNECTED':
-        case 'PONG':
-        case 'ERROR':
-          break
+          updateStoresFromCandle(msg.symbol, msg.data)
+        }
+        break
       }
-    },
-    [symbol]
-  )
+
+      case 'CONNECTED':
+      case 'PONG':
+      case 'ERROR':
+        break
+    }
+  }, [])
 
   const { sendJsonMessage, readyState } = useWebSocket(WS_URL, {
     onMessage: handleMessage,
     shouldReconnect: () => true,
     reconnectAttempts: 20,
-    reconnectInterval: (attemptNumber: number) => Math.min(1000 * Math.pow(2, attemptNumber), 30000),
-    heartbeat: {
-      message: JSON.stringify({ type: 'PING' } satisfies WsClientMessage),
-      returnMessage: 'pong',
-      interval: 25000,
-      timeout: 60000
-    }
+    reconnectInterval: (attemptNumber: number) => Math.min(1000 * Math.pow(2, attemptNumber), 30000)
   })
 
-  // Sync readyState → Zustand store
+  useEffect(() => {
+    if (readyState !== ReadyState.OPEN) {
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current)
+        pingIntervalRef.current = null
+      }
+      return
+    }
+
+    pingIntervalRef.current = setInterval(() => {
+      sendJsonMessage({ type: 'PING' } satisfies WsClientMessage)
+    }, 25_000)
+
+    return () => {
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current)
+        pingIntervalRef.current = null
+      }
+    }
+  }, [readyState, sendJsonMessage])
+
   useEffect(() => {
     const state = READY_STATE_MAP[readyState] ?? 'DISCONNECTED'
     useWebsocketStore.getState().setConnectionState(state)
   }, [readyState])
 
-  // Handle symbol subscribe/unsubscribe on changes
   useEffect(() => {
     if (readyState !== ReadyState.OPEN) return
 
-    // Unsubscribe from previous symbol
-    if (prevSymbolRef.current && prevSymbolRef.current !== symbol) {
-      sendJsonMessage({ type: 'UNSUBSCRIBE', symbol: prevSymbolRef.current } satisfies WsClientMessage)
+    const watchlistSymbols = useWatchlistStore.getState().symbols.map((s: WatchlistSymbol) => s.symbol)
+
+    for (const sym of watchlistSymbols) {
+      if (!subscribedRef.current.has(sym)) {
+        sendJsonMessage({ type: 'SUBSCRIBE', symbol: sym } satisfies WsClientMessage)
+        subscribedRef.current.add(sym)
+      }
     }
 
-    // Clear chart for new symbol
-    useChartStore.getState().setCandles([])
+    return () => {
+      subscribedRef.current.clear()
+    }
+  }, [readyState, sendJsonMessage])
 
-    // Subscribe to new symbol
-    sendJsonMessage({ type: 'SUBSCRIBE', symbol } satisfies WsClientMessage)
-    prevSymbolRef.current = symbol
-  }, [symbol, readyState, sendJsonMessage])
+  useEffect(() => {
+    if (readyState !== ReadyState.OPEN) return
+
+    const prev = prevActiveRef.current
+
+    if (prev !== activeSymbol) {
+      useChartStore.getState().setCandles([])
+
+      if (!subscribedRef.current.has(activeSymbol)) {
+        sendJsonMessage({ type: 'SUBSCRIBE', symbol: activeSymbol } satisfies WsClientMessage)
+        subscribedRef.current.add(activeSymbol)
+      } else {
+        sendJsonMessage({ type: 'UNSUBSCRIBE', symbol: activeSymbol } satisfies WsClientMessage)
+        sendJsonMessage({ type: 'SUBSCRIBE', symbol: activeSymbol } satisfies WsClientMessage)
+      }
+
+      prevActiveRef.current = activeSymbol
+    }
+  }, [activeSymbol, readyState, sendJsonMessage])
 }

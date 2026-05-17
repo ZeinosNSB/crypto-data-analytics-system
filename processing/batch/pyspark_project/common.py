@@ -1,5 +1,5 @@
 import os
-from urllib.parse import urlparse
+from urllib.parse import quote_plus, urlparse
 
 from pyspark.sql import SparkSession
 
@@ -15,6 +15,11 @@ DEFAULT_MINIO_ENDPOINT = "http://localhost:9000"
 DEFAULT_MINIO_ACCESS_KEY = "minioadmin"
 DEFAULT_MINIO_SECRET_KEY = "minioadmin"
 DEFAULT_MINIO_BUCKET = "crypto-lake"
+DEFAULT_MONGO_HOST = "localhost"
+DEFAULT_MONGO_PORT = "27017"
+DEFAULT_MONGO_DATABASE = "crypto_analytics"
+DEFAULT_MONGO_AUTH_SOURCE = "admin"
+DEFAULT_VOLUME_24H_COLLECTION = "volume_24h"
 
 
 def str_to_bool(value, default=False):
@@ -28,7 +33,10 @@ def get_minio_endpoint():
 
 
 def get_minio_access_key():
-    return os.getenv("MINIO_ROOT_USER", os.getenv("MINIO_ACCESS_KEY", DEFAULT_MINIO_ACCESS_KEY))
+    return os.getenv(
+        "MINIO_ROOT_USER",
+        os.getenv("MINIO_ACCESS_KEY", DEFAULT_MINIO_ACCESS_KEY),
+    )
 
 
 def get_minio_secret_key():
@@ -39,6 +47,44 @@ def get_minio_secret_key():
 
 def get_minio_bucket():
     return os.getenv("MINIO_BUCKET", DEFAULT_MINIO_BUCKET)
+
+
+def get_mongo_database():
+    return os.getenv(
+        "MONGO_DATABASE",
+        os.getenv("MONGO_DEFAULT_DATABASE", DEFAULT_MONGO_DATABASE),
+    )
+
+
+def get_mongo_volume_24h_collection():
+    return os.getenv("MONGO_COLLECTION_VOLUME_24H", DEFAULT_VOLUME_24H_COLLECTION)
+
+
+def get_mongo_uri():
+    explicit_uri = os.getenv("MONGO_URI", os.getenv("MONGODB_URI"))
+    if explicit_uri:
+        return explicit_uri
+
+    host = os.getenv(
+        "MONGO_HOST",
+        "mongodb" if os.getenv("RUNNING_IN_DOCKER") else DEFAULT_MONGO_HOST,
+    )
+    port = os.getenv("MONGO_PORT", os.getenv("MONGO_EXTERNAL_PORT", DEFAULT_MONGO_PORT))
+    database = get_mongo_database()
+    username = os.getenv("MONGO_USERNAME", os.getenv("MONGO_ROOT_USERNAME", ""))
+    password = os.getenv("MONGO_PASSWORD", os.getenv("MONGO_ROOT_PASSWORD", ""))
+
+    credentials = ""
+    auth_query = ""
+    if username and password:
+        credentials = f"{quote_plus(username)}:{quote_plus(password)}@"
+        auth_source = os.getenv("MONGO_AUTH_SOURCE", DEFAULT_MONGO_AUTH_SOURCE)
+        auth_query = f"?authSource={quote_plus(auth_source)}"
+
+    return (
+        f"mongodb://{credentials}{host}:{port}/"
+        f"{quote_plus(database)}{auth_query}"
+    )
 
 
 def raw_events_path():
