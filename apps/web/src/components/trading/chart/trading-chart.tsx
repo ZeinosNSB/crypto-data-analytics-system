@@ -31,6 +31,7 @@ export function TradingChart() {
   const containerRef = useRef<HTMLDivElement>(null)
   const candles = useChartStore(state => state.candles)
   const activeSymbol = useChartStore(state => state.activeSymbol)
+  const activeTimeframe = useChartStore(state => state.activeTimeframe)
 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
 
@@ -77,24 +78,94 @@ export function TradingChart() {
     return recentCandles.length > 0 ? recentCandles : normalizedCandles
   }, [normalizedCandles])
 
+  const timeframeInSeconds = useMemo(() => {
+    const timeframeMap: Record<string, number> = {
+      '1m': 60,
+      '5m': 5 * 60,
+      '15m': 15 * 60,
+      '1h': 60 * 60,
+      '4h': 4 * 60 * 60,
+      '1D': 24 * 60 * 60
+    }
+
+    return timeframeMap[activeTimeframe] ?? 60
+  }, [activeTimeframe])
+
+  const timeframeCandles = useMemo(() => {
+    if (visibleCandles.length === 0 || timeframeInSeconds <= 60) {
+      return visibleCandles
+    }
+
+    type AggregatedCandle = {
+      bucket: number
+      open: number
+      high: number
+      low: number
+      close: number
+      volume: number
+      lastTime: number
+    }
+
+    const groups = new Map<number, AggregatedCandle>()
+
+    for (const candle of visibleCandles) {
+      const candleTime = Number(candle.time)
+      const bucket = Math.floor(candleTime / timeframeInSeconds) * timeframeInSeconds
+      const existing = groups.get(bucket)
+
+      if (!existing) {
+        groups.set(bucket, {
+          bucket,
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close,
+          volume: candle.volume,
+          lastTime: candleTime
+        })
+        continue
+      }
+
+      existing.high = Math.max(existing.high, candle.high)
+      existing.low = Math.min(existing.low, candle.low)
+      existing.volume += candle.volume
+
+      if (candleTime >= existing.lastTime) {
+        existing.close = candle.close
+        existing.lastTime = candleTime
+      }
+    }
+
+    return Array.from(groups.values())
+      .sort((left, right) => left.bucket - right.bucket)
+      .map(group => ({
+        time: group.bucket,
+        open: group.open,
+        high: group.high,
+        low: group.low,
+        close: group.close,
+        volume: group.volume
+      }))
+  }, [visibleCandles, timeframeInSeconds])
+
   // Format data for lightweight-charts
   const chartData = useMemo(() => {
-    return visibleCandles.map(c => ({
+    return timeframeCandles.map(c => ({
       time: c.time,
       open: c.open,
       high: c.high,
       low: c.low,
       close: c.close
     }))
-  }, [visibleCandles])
+  }, [timeframeCandles])
 
   const volumeData = useMemo(() => {
-    return visibleCandles.map(c => ({
+    return timeframeCandles.map(c => ({
       time: c.time,
       value: c.volume,
       color: c.close >= c.open ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)'
     }))
-  }, [visibleCandles])
+  }, [timeframeCandles])
 
   return (
     <div ref={containerRef} className='absolute inset-0'>
@@ -174,7 +245,7 @@ export function TradingChart() {
       </ChartErrorBoundary>
 
       {/* Loading state when no candles */}
-      {visibleCandles.length === 0 && (
+      {timeframeCandles.length === 0 && (
         <div className='pointer-events-none absolute inset-0 flex items-center justify-center'>
           <div className='flex flex-col items-center gap-3'>
             <div className='h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent' />
