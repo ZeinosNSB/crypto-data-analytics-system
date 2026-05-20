@@ -136,7 +136,6 @@ async function runCollector() {
             await new Promise(resolve => setTimeout(resolve, randomizedBackoff));
         }
     }
-  }
 }
 
 // ==========================================
