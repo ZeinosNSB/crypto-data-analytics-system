@@ -65,7 +65,7 @@ function updateStoresFromCandle(symbol: string, payload: OhlcCandlePayload) {
   })
 }
 
-export function useMarketWebsocket(activeSymbol: string) {
+export function useMarketWebsocket(activeSymbol?: string) {
   const prevActiveRef = useRef<string | null>(null)
   const subscribedRef = useRef<Set<string>>(new Set())
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -156,7 +156,7 @@ export function useMarketWebsocket(activeSymbol: string) {
   }, [readyState, sendJsonMessage])
 
   useEffect(() => {
-    if (readyState !== ReadyState.OPEN) return
+    if (readyState !== ReadyState.OPEN || !activeSymbol) return
 
     const prev = prevActiveRef.current
 
