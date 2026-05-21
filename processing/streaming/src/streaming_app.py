@@ -27,6 +27,7 @@ logger = logging.getLogger("StreamingApp")
 ROOT_DIR = Path(__file__).resolve().parents[3]
 CONTRACT_PATH = ROOT_DIR / "docs" / "contracts" / "contract.v1.json"
 MINUTE_MS = 60_000
+DEFAULT_SYMBOL_FILTER = 'BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT'
 
 
 def decimal_to_str(value: Decimal) -> str:
@@ -122,7 +123,7 @@ class StreamingApp:
         self.redis_history_limit = int(os.getenv("REDIS_HISTORY_LIMIT", "120"))
         self.alert_move_threshold_pct = Decimal(os.getenv("ALERT_MOVE_PCT", "0.5"))
 
-        symbols = os.getenv("SYMBOLS", "")
+        symbols = os.getenv("SYMBOLS", DEFAULT_SYMBOL_FILTER)
         self.symbol_filter = {
             symbol.strip().upper()
             for symbol in symbols.split(",")
@@ -203,7 +204,7 @@ class StreamingApp:
         print(f"OHLC prefix         : {self.redis_ohlc_prefix}")
         print(f"Alert threshold pct : {decimal_to_str(self.alert_move_threshold_pct)}")
         if self.symbol_filter:
-            print(f"Symbol filter       : {', '.join(sorted(self.symbol_filter))}")
+            print(f"Symbol filter       : {len(self.symbol_filter)} symbols -> {', '.join(sorted(self.symbol_filter))}")
         else:
             print("Symbol filter       : (disabled)")
         print("\nProcessing market_events -> 1m OHLC -> Redis + price alerts")

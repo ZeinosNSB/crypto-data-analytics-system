@@ -8,13 +8,14 @@ require('dotenv').config()
 // 1. CẤU HÌNH BIẾN MÔI TRƯỜNG & KHAI BÁO
 // ==========================================
 function parseSymbols(value) {
-  return String(value || '')
+  return [...new Set(String(value || '')
     .split(',')
     .map(symbol => symbol.trim())
-    .filter(Boolean)
+    .filter(Boolean))]
 }
 
-const SYMBOLS = parseSymbols(process.env.SYMBOLS || process.env.SYMBOL || 'BTC/USDT,ETH/USDT')
+const DEFAULT_SYMBOLS = 'BTC/USDT,ETH/USDT,SOL/USDT,BNB/USDT,XRP/USDT'
+const SYMBOLS = parseSymbols(process.env.SYMBOLS || process.env.SYMBOL || DEFAULT_SYMBOLS)
 const KAFKA_BROKER = process.env.KAFKA_BROKER || 'localhost:9092'
 const TOPIC = process.env.KAFKA_TOPIC || 'market_events'
 const PORT = process.env.PORT || 3000
@@ -117,7 +118,7 @@ async function runCollector() {
   const exchange = new ccxt.pro.binance({ enableRateLimit: true })
   isHealthy = true // Đánh dấu app đã sẵn sàng
 
-  console.log(`🚀 Bắt đầu stream dữ liệu ${SYMBOLS.join(', ')} từ Binance WebSocket...`)
+  console.log(`🚀 Bắt đầu stream ${SYMBOLS.length} symbol: ${SYMBOLS.join(', ')} từ Binance WebSocket...`)
 
   await Promise.all(SYMBOLS.map(symbol => runSymbolWorker(exchange, symbol)))
 }
