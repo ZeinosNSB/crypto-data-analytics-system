@@ -152,6 +152,7 @@ services:
       KAFKA_TOPIC: market_events
       KAFKA_GROUP_ID: streaming-hot-path
       AUTO_OFFSET_RESET: latest
+      SYMBOLS: BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_DB: "0"
@@ -176,7 +177,7 @@ services:
     environment:
       KAFKA_BROKER: kafka:9092
       KAFKA_TOPIC: market_events
-      SYMBOL: BTC/USDT
+      SYMBOLS: BTC/USDT,ETH/USDT,SOL/USDT,BNB/USDT,XRP/USDT
     depends_on:
       kafka:
         condition: service_healthy

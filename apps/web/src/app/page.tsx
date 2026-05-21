@@ -2,6 +2,7 @@ import { GithubLogoIcon } from '@phosphor-icons/react/ssr'
 import { ArchitectureFlow } from '@workspace/web/components/features/home/architecture-flow'
 import Features from '@workspace/web/components/features/home/features'
 import Hero from '@workspace/web/components/features/home/hero'
+import { LivePrices } from '@workspace/web/components/features/home/live-prices'
 import Overview from '@workspace/web/components/features/home/overview'
 import TechStack from '@workspace/web/components/features/home/tech-stack'
 import Footer from '@workspace/web/components/layout/footer'
@@ -23,6 +24,9 @@ export default function Page() {
           <Hero />
         </div>
       </section>
+
+      {/* Live prices */}
+      <LivePrices />
 
       {/* Overview */}
       <Overview />

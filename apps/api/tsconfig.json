@@ -6,7 +6,7 @@
     "target": "ESNext",
     "esModuleInterop": true,
     "outDir": "dist",
-    "types": ["bun"]
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*.ts", "*.ts"],
   "exclude": ["dist", "node_modules", "**/*.spec.ts", "**/*.test.ts"]

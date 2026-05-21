@@ -7,7 +7,15 @@ require('dotenv').config()
 // ==========================================
 // 1. CẤU HÌNH BIẾN MÔI TRƯỜNG & KHAI BÁO
 // ==========================================
-const SYMBOL = process.env.SYMBOL || 'BTC/USDT'
+function parseSymbols(value) {
+  return [...new Set(String(value || '')
+    .split(',')
+    .map(symbol => symbol.trim())
+    .filter(Boolean))]
+}
+
+const DEFAULT_SYMBOLS = 'BTC/USDT,ETH/USDT,SOL/USDT,BNB/USDT,XRP/USDT'
+const SYMBOLS = parseSymbols(process.env.SYMBOLS || process.env.SYMBOL || DEFAULT_SYMBOLS)
 const KAFKA_BROKER = process.env.KAFKA_BROKER || 'localhost:9092'
 const TOPIC = process.env.KAFKA_TOPIC || 'market_events'
 const PORT = process.env.PORT || 3000
@@ -137,6 +145,23 @@ async function runCollector() {
         }
     }
   }
+}
+
+async function runCollector() {
+  await producer.connect()
+  console.log('✅ Đã kết nối Kafka')
+
+  if (SYMBOLS.length === 0) {
+    throw new Error('Không có symbol hợp lệ để ingest')
+  }
+
+  // Dùng ccxt.pro để lấy bản WebSocket hỗ trợ Realtime
+  const exchange = new ccxt.pro.binance({ enableRateLimit: true })
+  isHealthy = true // Đánh dấu app đã sẵn sàng
+
+  console.log(`🚀 Bắt đầu stream ${SYMBOLS.length} symbol: ${SYMBOLS.join(', ')} từ Binance WebSocket...`)
+
+  await Promise.all(SYMBOLS.map(symbol => runSymbolWorker(exchange, symbol)))
 }
 
 // ==========================================

@@ -1,43 +1,34 @@
 'use client'
 
 import { useChartStore } from '@workspace/web/stores/chart.store'
-import { ColorType } from 'lightweight-charts'
-import { CandlestickSeries, Chart, HistogramSeries, Pane, PriceScale } from 'lightweight-charts-react-components'
+import {
+  CandlestickSeries,
+  ColorType,
+  HistogramSeries,
+  createChart,
+  type CandlestickData,
+  type HistogramData,
+  type IChartApi,
+  type UTCTimestamp
+} from 'lightweight-charts'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-
-class ChartErrorBoundary extends React.Component<
-  { children: React.ReactNode; fallback: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
-    super(props)
-    this.state = { hasError: false }
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true }
-  }
-
-  override render() {
-    if (this.state.hasError) {
-      return this.props.fallback
-    }
-
-    return this.props.children
-  }
-}
 
 export function TradingChart() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<IChartApi | null>(null)
+  const candlestickSeriesRef = useRef<{ setData: (data: Array<CandlestickData>) => void } | null>(null)
+  const histogramSeriesRef = useRef<{ setData: (data: Array<HistogramData>) => void } | null>(null)
+  const hasFittedRef = useRef(false)
+
   const candles = useChartStore(state => state.candles)
   const activeSymbol = useChartStore(state => state.activeSymbol)
   const activeTimeframe = useChartStore(state => state.activeTimeframe)
 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
 
-  // Handle Resize
   useEffect(() => {
     if (!containerRef.current) return
+
     const resizeObserver = new ResizeObserver(entries => {
       for (const entry of entries) {
         setDimensions({
@@ -46,6 +37,7 @@ export function TradingChart() {
         })
       }
     })
+
     resizeObserver.observe(containerRef.current)
     return () => resizeObserver.disconnect()
   }, [])
@@ -254,7 +246,6 @@ export function TradingChart() {
         </div>
       )}
 
-      {/* Watermark Logo */}
       <div className='pointer-events-none absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center opacity-[0.03]'>
         <div className='flex h-32 w-32 items-center justify-center rounded bg-gradient-to-tr from-blue-600 to-cyan-500 text-6xl font-bold text-white'>
           A
