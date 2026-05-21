@@ -140,125 +140,103 @@ export function TradingChart() {
       }))
   }, [visibleCandles, timeframeInSeconds])
 
-  const chartData = useMemo<Array<CandlestickData>>(() => {
-    return timeframeCandles.map(candle => ({
-      time: Number(candle.time) as UTCTimestamp,
-      open: candle.open,
-      high: candle.high,
-      low: candle.low,
-      close: candle.close
+  // Format data for lightweight-charts
+  const chartData = useMemo(() => {
+    return timeframeCandles.map(c => ({
+      time: c.time,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close
     }))
   }, [timeframeCandles])
 
-  const volumeData = useMemo<Array<HistogramData>>(() => {
-    return timeframeCandles.map(candle => ({
-      time: Number(candle.time) as UTCTimestamp,
-      value: candle.volume,
-      color: candle.close >= candle.open ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)'
+  const volumeData = useMemo(() => {
+    return timeframeCandles.map(c => ({
+      time: c.time,
+      value: c.volume,
+      color: c.close >= c.open ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)'
     }))
   }, [timeframeCandles])
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const chart = createChart(container, {
-      width: dimensions.width,
-      height: dimensions.height,
-      layout: {
-        background: { type: ColorType.Solid, color: '#131722' },
-        textColor: '#94a3b8'
-      },
-      grid: {
-        vertLines: { color: '#1e222d' },
-        horzLines: { color: '#1e222d' }
-      },
-      timeScale: {
-        timeVisible: true,
-        secondsVisible: false,
-        borderColor: '#1e222d'
-      },
-      rightPriceScale: {
-        borderColor: '#1e222d'
-      },
-      crosshair: {
-        mode: 1,
-        vertLine: {
-          color: '#334155',
-          width: 1,
-          style: 3,
-          labelBackgroundColor: '#1e293b'
-        },
-        horzLine: {
-          color: '#334155',
-          width: 1,
-          style: 3,
-          labelBackgroundColor: '#1e293b'
-        }
-      }
-    })
-
-    const candlestickSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#22c55e',
-      downColor: '#ef4444',
-      borderVisible: false,
-      wickUpColor: '#22c55e',
-      wickDownColor: '#ef4444'
-    })
-
-    const histogramSeries = chart.addSeries(HistogramSeries, {
-      priceFormat: { type: 'volume' },
-      priceScaleId: 'volume'
-    })
-
-    chart.priceScale('volume').applyOptions({
-      scaleMargins: {
-        top: 0.8,
-        bottom: 0
-      }
-    })
-
-    chartRef.current = chart
-    candlestickSeriesRef.current = candlestickSeries
-    histogramSeriesRef.current = histogramSeries
-
-    return () => {
-      chartRef.current = null
-      candlestickSeriesRef.current = null
-      histogramSeriesRef.current = null
-      hasFittedRef.current = false
-      chart.remove()
-    }
-  }, [])
-
-  useEffect(() => {
-    chartRef.current?.resize(dimensions.width, dimensions.height)
-  }, [dimensions])
-
-  useEffect(() => {
-    if (!chartRef.current || !candlestickSeriesRef.current || !histogramSeriesRef.current) {
-      return
-    }
-
-    candlestickSeriesRef.current.setData(chartData)
-    histogramSeriesRef.current.setData(volumeData)
-
-    if (chartData.length > 0) {
-      if (!hasFittedRef.current) {
-        chartRef.current.timeScale().fitContent()
-        hasFittedRef.current = true
-      }
-    } else {
-      hasFittedRef.current = false
-    }
-  }, [activeSymbol, activeTimeframe, chartData, volumeData])
-
-  useEffect(() => {
-    hasFittedRef.current = false
-  }, [activeSymbol, activeTimeframe])
 
   return (
     <div ref={containerRef} className='absolute inset-0'>
+      <ChartErrorBoundary
+        fallback={
+          <div className='flex h-full items-center justify-center rounded border border-slate-800 bg-[#131722] text-sm text-slate-500'>
+            Chart unavailable while market data stabilizes.
+          </div>
+        }
+      >
+        <Chart
+          options={{
+            width: dimensions.width,
+            height: dimensions.height,
+            layout: {
+              background: { type: ColorType.Solid, color: '#131722' },
+              textColor: '#94a3b8'
+            },
+            grid: {
+              vertLines: { color: '#1e222d' },
+              horzLines: { color: '#1e222d' }
+            },
+            timeScale: {
+              timeVisible: true,
+              secondsVisible: false,
+              borderColor: '#1e222d'
+            },
+            rightPriceScale: {
+              borderColor: '#1e222d'
+            },
+            crosshair: {
+              mode: 1,
+              vertLine: {
+                color: '#334155',
+                width: 1,
+                style: 3,
+                labelBackgroundColor: '#1e293b'
+              },
+              horzLine: {
+                color: '#334155',
+                width: 1,
+                style: 3,
+                labelBackgroundColor: '#1e293b'
+              }
+            }
+          }}
+        >
+          <Pane>
+            <CandlestickSeries
+              data={chartData}
+              options={{
+                upColor: '#22c55e',
+                downColor: '#ef4444',
+                borderVisible: false,
+                wickUpColor: '#22c55e',
+                wickDownColor: '#ef4444'
+              }}
+            />
+            <HistogramSeries
+              data={volumeData}
+              options={{
+                priceFormat: { type: 'volume' },
+                priceScaleId: ''
+              }}
+            />
+            <PriceScale
+              id=''
+              options={{
+                scaleMargins: {
+                  top: 0.8,
+                  bottom: 0
+                }
+              }}
+            />
+          </Pane>
+        </Chart>
+      </ChartErrorBoundary>
+
+      {/* Loading state when no candles */}
       {timeframeCandles.length === 0 && (
         <div className='pointer-events-none absolute inset-0 flex items-center justify-center'>
           <div className='flex flex-col items-center gap-3'>

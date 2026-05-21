@@ -77,31 +77,72 @@ function formatToContractV1(trade) {
 // ==========================================
 // 5. LUỒNG CHÍNH: CHẠY WEBSOCKET (HOT PATH)
 // ==========================================
-async function runSymbolWorker(exchange, symbol) {
-  while (isHealthy) {
-    try {
-      const trades = await exchange.watchTrades(symbol)
+async function runCollector() {
+    await producer.connect();
+    console.log('✅ Đã kết nối Kafka');
 
-      for (const trade of trades) {
-        if (!isHealthy) {
-          break
+    const exchange = new ccxt.pro.binance({ enableRateLimit: true });
+    isHealthy = true;
+
+    console.log(`🚀 Bắt đầu stream dữ liệu ${SYMBOL} từ Binance WebSocket...`);
+
+    // --- CẤU HÌNH RECONNECT ---
+    let retryCount = 0;
+    const INITIAL_BACKOFF_MS = 1000; // Khởi điểm chờ 1 giây
+    const MAX_BACKOFF_MS = 60000;    // Chờ tối đa 60 giây
+
+    while (true) {
+        try {
+            const trades = await exchange.watchTrades(SYMBOL);
+            
+            // Nếu có data tức là kết nối đã thành công/khôi phục, reset bộ đếm
+            if (retryCount > 0) {
+                console.log('✅ Đã khôi phục kết nối WebSocket thành công!');
+                retryCount = 0;
+                isHealthy = true;
+            }
+            
+            for (let trade of trades) {
+                const payload = formatToContractV1(trade);
+                
+                await producer.send({
+                    topic: TOPIC,
+                    messages: [{ value: JSON.stringify(payload) }],
+                });
+                
+                messagesSent.inc();
+                // console.log(`✅ Đã ném vào Kafka - Giá BTC: ${payload.price}`);
+            }
+        } catch (error) {
+            console.error(`❌ Lỗi WebSocket: ${error.message}`);
+            wsErrors.inc();
+            isHealthy = false; 
+            
+            // 1. Tính toán thời gian chờ lũy thừa (Exponential Backoff)
+            retryCount++;
+            let backoffTime = INITIAL_BACKOFF_MS * Math.pow(2, retryCount - 1);
+            
+            // Đảm bảo không vượt quá thời gian chờ tối đa
+            if (backoffTime > MAX_BACKOFF_MS) {
+                backoffTime = MAX_BACKOFF_MS;
+            }
+
+            // 2. Thêm độ nhiễu ngẫu nhiên +/- 20% (Jitter)
+            const jitter = backoffTime * 0.2;
+            const randomizedBackoff = backoffTime + (Math.random() * 2 * jitter - jitter);
+
+            console.log(`⏳ Mất mạng. Thử kết nối lại lần ${retryCount} sau ${Math.round(randomizedBackoff / 1000)} giây...`);
+            
+            // 3. Đóng kết nối cũ (nếu có bị kẹt) trước khi thử lại
+            try {
+                // Xóa cache kết nối nội bộ của CCXT để tránh lỗi rác
+                delete exchange.clients[exchange.urls.api.ws];
+            } catch (e) {
+                // Bỏ qua lỗi nếu object không tồn tại
+            }
+
+            await new Promise(resolve => setTimeout(resolve, randomizedBackoff));
         }
-
-        const payload = formatToContractV1(trade)
-
-        await producer.send({
-          topic: TOPIC,
-          messages: [{ value: JSON.stringify(payload) }]
-        })
-
-        messagesSent.inc()
-      }
-    } catch (error) {
-      console.error(`❌ Lỗi WebSocket [${symbol}]:`, error.message)
-      wsErrors.inc()
-      isHealthy = false
-      await new Promise((resolve) => setTimeout(resolve, 5000))
-      isHealthy = true
     }
   }
 }
